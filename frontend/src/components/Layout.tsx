@@ -11,10 +11,10 @@ export default function Layout({ children }: LayoutProps) {
       <header className="bg-white border-b border-gray-100">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            {/* Spill logo - teal drop with smile */}
+            {/* Spill logo - teal drop with smile (paisley/comma shape) */}
             <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M50 0C50 0 95 45 95 65C95 85 75 100 50 100C25 100 5 85 5 65C5 45 50 0 50 0Z" fill="#2DD4BF"/>
-              <path d="M25 62C25 62 30 75 45 75" stroke="white" strokeWidth="8" strokeLinecap="round"/>
+              <path d="M55 2C55 2 92 40 92 62C92 85 72 98 50 98C22 98 5 78 5 55C5 32 35 20 50 20C58 20 62 15 55 2Z" fill="#2DD4BF"/>
+              <path d="M28 58C28 58 34 72 50 72" stroke="white" strokeWidth="7" strokeLinecap="round"/>
             </svg>
             <span className="text-xl font-extrabold text-slate-900">spill</span>
           </Link>
