@@ -204,10 +204,7 @@ export async function createTherapistFromCV(file: File | null, adminNotes: Admin
   if (adminNotes.overrideEmail) {
     formData.append('overrideEmail', adminNotes.overrideEmail);
   }
-  if (adminNotes.overrideSpecialisms) {
-    formData.append('overrideSpecialisms', JSON.stringify(adminNotes.overrideSpecialisms));
-  }
-  // New category overrides
+  // Category overrides
   if (adminNotes.overrideApproach) {
     formData.append('overrideApproach', JSON.stringify(adminNotes.overrideApproach));
   }

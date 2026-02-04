@@ -5,7 +5,7 @@ import TherapistCard from '../components/TherapistCard';
 import FilterBar from '../components/FilterBar';
 
 export default function TherapistsPage() {
-  const [selectedSpecialism, setSelectedSpecialism] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const {
     data: therapists,
@@ -22,18 +22,25 @@ export default function TherapistsPage() {
     return therapists.filter((t) => t.active);
   }, [therapists]);
 
-  // Extract unique specialisms from active therapists only
-  const allSpecialisms = useMemo(() => {
-    const specialismSet = new Set<string>();
-    activeTherapists.forEach((t) => t.specialisms.forEach((s) => specialismSet.add(s)));
-    return Array.from(specialismSet).sort();
+  // Helper to get all categories for a therapist
+  const getAllCategories = (t: { approach: string[]; style: string[]; areasOfFocus: string[] }) => {
+    return [...(t.approach || []), ...(t.style || []), ...(t.areasOfFocus || [])];
+  };
+
+  // Extract unique categories from active therapists (combines approach, style, areasOfFocus)
+  const allCategories = useMemo(() => {
+    const categorySet = new Set<string>();
+    activeTherapists.forEach((t) => {
+      getAllCategories(t).forEach((c) => categorySet.add(c));
+    });
+    return Array.from(categorySet).sort();
   }, [activeTherapists]);
 
-  // Filter therapists by selected specialism
+  // Filter therapists by selected category
   const filteredTherapists = useMemo(() => {
-    if (!selectedSpecialism) return activeTherapists;
-    return activeTherapists.filter((t) => t.specialisms.includes(selectedSpecialism));
-  }, [activeTherapists, selectedSpecialism]);
+    if (!selectedCategory) return activeTherapists;
+    return activeTherapists.filter((t) => getAllCategories(t).includes(selectedCategory));
+  }, [activeTherapists, selectedCategory]);
 
   if (isLoading) {
     return (
@@ -67,11 +74,11 @@ export default function TherapistsPage() {
   return (
     <div>
       {/* Filter Bar */}
-      {allSpecialisms.length > 0 && (
+      {allCategories.length > 0 && (
         <FilterBar
-          specialisms={allSpecialisms}
-          selectedSpecialism={selectedSpecialism}
-          onFilterChange={setSelectedSpecialism}
+          categories={allCategories}
+          selectedCategory={selectedCategory}
+          onFilterChange={setSelectedCategory}
         />
       )}
 
@@ -85,13 +92,13 @@ export default function TherapistsPage() {
           </div>
           <h2 className="text-lg font-semibold text-slate-900 mb-2">No therapists found</h2>
           <p className="text-slate-600">
-            {selectedSpecialism
-              ? `No therapists available for "${selectedSpecialism}". Try a different filter.`
+            {selectedCategory
+              ? `No therapists available for "${selectedCategory}". Try a different filter.`
               : 'No therapists are currently available. Please check back soon.'}
           </p>
-          {selectedSpecialism && (
+          {selectedCategory && (
             <button
-              onClick={() => setSelectedSpecialism(null)}
+              onClick={() => setSelectedCategory(null)}
               className="mt-4 px-4 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
             >
               Clear filter
@@ -102,7 +109,7 @@ export default function TherapistsPage() {
         <>
           <p className="text-sm text-slate-500 mb-6">
             Showing {filteredTherapists.length} therapist{filteredTherapists.length !== 1 ? 's' : ''}
-            {selectedSpecialism && ` specializing in ${selectedSpecialism}`}
+            {selectedCategory && ` for "${selectedCategory}"`}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredTherapists.map((therapist) => (

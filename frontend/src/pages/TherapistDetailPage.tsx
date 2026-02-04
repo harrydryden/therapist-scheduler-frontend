@@ -3,6 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { getTherapist } from '../api/client';
 import BookingForm from '../components/BookingForm';
 import { sanitizeImageUrl } from '../utils/sanitize';
+import {
+  APPROACH_OPTIONS,
+  STYLE_OPTIONS,
+  AREAS_OF_FOCUS_OPTIONS,
+} from '../config/therapist-categories';
 
 export default function TherapistDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -67,15 +72,70 @@ export default function TherapistDetailPage() {
               <div className="p-6 md:w-2/3">
                 <h1 className="text-2xl font-bold text-gray-900 mb-2 break-words">{therapist.name}</h1>
 
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {therapist.specialisms.map((specialism) => (
-                    <span
-                      key={specialism}
-                      className="inline-block px-3 py-1 text-sm font-medium bg-primary-100 text-primary-700 rounded-full"
-                    >
-                      {specialism}
-                    </span>
-                  ))}
+                {/* Categories */}
+                <div className="space-y-3 mb-4">
+                  {/* Approach */}
+                  {therapist.approach && therapist.approach.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Approach</span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {therapist.approach.map((item) => {
+                          const option = APPROACH_OPTIONS.find((o) => o.type === item);
+                          return (
+                            <span
+                              key={item}
+                              className="inline-block px-2.5 py-1 text-xs font-medium bg-teal-50 text-teal-700 rounded-full"
+                              title={option?.explainer}
+                            >
+                              {item}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Style */}
+                  {therapist.style && therapist.style.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Style</span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {therapist.style.map((item) => {
+                          const option = STYLE_OPTIONS.find((o) => o.type === item);
+                          return (
+                            <span
+                              key={item}
+                              className="inline-block px-2.5 py-1 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full"
+                              title={option?.explainer}
+                            >
+                              {item}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Areas of Focus */}
+                  {therapist.areasOfFocus && therapist.areasOfFocus.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Focus Areas</span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {therapist.areasOfFocus.map((item) => {
+                          const option = AREAS_OF_FOCUS_OPTIONS.find((o) => o.type === item);
+                          return (
+                            <span
+                              key={item}
+                              className="inline-block px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-700 rounded-full"
+                              title={option?.explainer}
+                            >
+                              {item}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <p className="text-gray-600 mb-4">{therapist.bio}</p>
