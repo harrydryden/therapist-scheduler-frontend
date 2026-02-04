@@ -80,9 +80,9 @@ function CategorySection({ label, items, categoryType, maxItems = 3 }: CategoryS
   const remainingCount = hasItems ? items.length - maxItems : 0;
 
   return (
-    <div className="mb-2">
+    <div className="mb-2 min-h-[52px]">
       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
-      <div className="flex flex-wrap gap-1.5 mt-1">
+      <div className="flex flex-wrap gap-1.5 mt-1 min-h-[28px]">
         {hasItems ? (
           <>
             {displayItems.map((item) => (
@@ -206,13 +206,13 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200">
-      {/* Name and categories */}
-      <div className="p-6">
-        <h3 className="text-xl font-bold text-slate-900 break-words line-clamp-2">{therapist.name}</h3>
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200 flex flex-col h-full">
+      {/* Name and categories - fixed height */}
+      <div className="p-6 min-h-[56px]">
+        <h3 className="text-xl font-bold text-slate-900 break-words line-clamp-1">{therapist.name}</h3>
 
         {/* Category system with tooltips - shows "General" fallback if empty */}
-        <div className="mt-4 space-y-2">
+        <div className="mt-4">
           <CategorySection
             label={CATEGORY_LABELS.areasOfFocus}
             items={therapist.areasOfFocus || []}
@@ -234,8 +234,8 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
         </div>
       </div>
 
-      {/* Bio */}
-      <div className="px-6 pb-4">
+      {/* Bio - fixed height container */}
+      <div className="px-6 pb-4 min-h-[100px]">
         <p className="text-sm text-slate-600 leading-relaxed">
           {isExpanded ? therapist.bio : therapist.bio.slice(0, 120) + (therapist.bio.length > 120 ? '...' : '')}
         </p>
@@ -249,18 +249,19 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
         )}
       </div>
 
-      {/* Availability Section */}
-      <div className="px-6 pb-5">
+      {/* Availability Section - fixed height */}
+      <div className="px-6 pb-5 min-h-[120px]">
         <div className="pt-4 border-t border-slate-100">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Availability</span>
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Indicative Availability</span>
+          <p className="text-xs text-slate-400 mt-0.5">More times available upon request</p>
           <div className="mt-2">
             <AvailabilityDisplay availability={therapist.availability} />
           </div>
         </div>
       </div>
 
-      {/* Booking Form */}
-      <div className="border-t border-slate-100 p-6 bg-slate-50">
+      {/* Booking Form - pushed to bottom with mt-auto */}
+      <div className="border-t border-slate-100 p-6 bg-slate-50 mt-auto">
         {mutation.isSuccess ? (
           <div className="text-center py-2">
             <div className="inline-flex items-center justify-center w-12 h-12 bg-teal-100 rounded-full mb-3">
