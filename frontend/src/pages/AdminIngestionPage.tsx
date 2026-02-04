@@ -404,7 +404,14 @@ export default function AdminIngestionPage() {
                 rows={8}
                 maxLength={12000}
                 className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none resize-y"
-                placeholder="Enter any additional context about the therapist that isn't in the CV. This could include their preferred approach, specific populations they work with, additional qualifications, bio preferences, etc."
+                placeholder={`Enter information about the therapist. Include details about:
+
+- Their therapeutic approach (e.g., CBT, Mindfulness, Person-Centred, Integrative)
+- Their working style (e.g., Directive/Guiding, Solution Focused, Relational, Working at Depth)
+- Areas they specialize in (e.g., Anxiety, Depression, Trauma, Relationships, Work Stress, Family, Identity)
+- Their qualifications and training
+- Their background and experience
+- Any bio preferences or specific wording to use`}
               />
               <p className="text-sm text-slate-500 mt-1">
                 {additionalInfo.length.toLocaleString()} / 12,000 characters
