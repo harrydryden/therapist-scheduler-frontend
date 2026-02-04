@@ -2,6 +2,12 @@
  * Centralized constants for the frontend application
  */
 
+// Application branding
+export const APP = {
+  COORDINATOR_NAME: 'Justin Time',
+  DEFAULT_TIMEZONE: 'Europe/London',
+} as const;
+
 // HTTP Headers
 export const HEADERS = {
   WEBHOOK_SECRET: 'x-webhook-secret',

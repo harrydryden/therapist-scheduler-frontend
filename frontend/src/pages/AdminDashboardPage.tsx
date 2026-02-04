@@ -11,6 +11,7 @@ import {
   deleteAppointment,
 } from '../api/client';
 import type { AppointmentFilters, AppointmentListItem } from '../types';
+import { APP } from '../config/constants';
 
 // Sanitize text content to prevent XSS
 function sanitizeText(text: string): string {
@@ -70,7 +71,7 @@ export default function AdminDashboardPage() {
     queryKey: ['appointments', filters],
     queryFn: () => getAppointments(filters),
     refetchInterval: 30000, // Refresh every 30 seconds
-    staleTime: 15000, // Consider data stale after 15 seconds
+    staleTime: 30000, // Keep data fresh for the refetch interval to avoid redundant fetches
   });
 
   // Fetch stats with auto-refresh every 30 seconds
@@ -78,7 +79,7 @@ export default function AdminDashboardPage() {
     queryKey: ['dashboard-stats'],
     queryFn: getDashboardStats,
     refetchInterval: 30000, // Refresh every 30 seconds
-    staleTime: 15000, // Consider data stale after 15 seconds
+    staleTime: 30000, // Keep data fresh for the refetch interval to avoid redundant fetches
   });
 
   // Fetch selected appointment detail
@@ -819,7 +820,7 @@ export default function AdminDashboardPage() {
                             }`}
                           >
                             {msg.role === 'assistant'
-                              ? 'Justin Time'
+                              ? APP.COORDINATOR_NAME
                               : msg.role === 'admin'
                                 ? 'Admin (Human)'
                                 : 'Email Received'}

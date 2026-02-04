@@ -10,6 +10,7 @@ import {
   CATEGORY_COLORS,
   type CategoryOption,
 } from '../config/therapist-categories';
+import { APP } from '../config/constants';
 
 // Days of the week for availability
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
@@ -226,7 +227,7 @@ function convertToTherapistAvailability(availability: AvailabilityByDay): Therap
   if (slots.length === 0) return undefined;
 
   return {
-    timezone: 'Europe/London',
+    timezone: APP.DEFAULT_TIMEZONE,
     slots,
   };
 }

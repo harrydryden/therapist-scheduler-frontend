@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { submitAppointmentRequest } from '../api/client';
 import type { TherapistDetail, AppointmentRequest } from '../types';
+import { APP } from '../config/constants';
 
 interface BookingFormProps {
   therapist: TherapistDetail;
@@ -68,7 +69,7 @@ export default function BookingForm({ therapist }: BookingFormProps) {
         </svg>
         <h3 className="text-lg font-semibold text-green-800 mb-2">Request Submitted!</h3>
         <p className="text-green-700">
-          We've received your appointment request. Our scheduling coordinator Justin Time will email you shortly to find a
+          We've received your appointment request. Our scheduling coordinator {APP.COORDINATOR_NAME} will email you shortly to find a
           time that works for both you and {therapist.name}.
         </p>
       </div>
