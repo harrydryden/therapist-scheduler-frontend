@@ -197,9 +197,9 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
           {therapist.name}
         </h3>
 
-        {/* Categories container - all sections limited to 1 row when collapsed (46px each) */}
+        {/* Categories container - all sections limited to 1 row when collapsed (56px each: 18px label + 6px margin + 32px badges) */}
         {/* Areas of Focus */}
-        <div className={`${isExpanded('areasOfFocus') ? '' : 'h-[46px]'} overflow-hidden`}>
+        <div className={`${isExpanded('areasOfFocus') ? '' : 'h-[56px]'} overflow-hidden`}>
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
             {CATEGORY_LABELS.areasOfFocus}
           </span>
@@ -233,7 +233,7 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
         </div>
 
         {/* Approach */}
-        <div className={`${isExpanded('approach') ? '' : 'h-[46px]'} overflow-hidden`}>
+        <div className={`${isExpanded('approach') ? '' : 'h-[56px]'} overflow-hidden`}>
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
             {CATEGORY_LABELS.approach}
           </span>
@@ -267,7 +267,7 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
         </div>
 
         {/* Style */}
-        <div className={`${isExpanded('style') ? '' : 'h-[46px]'} overflow-hidden`}>
+        <div className={`${isExpanded('style') ? '' : 'h-[56px]'} overflow-hidden`}>
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
             {CATEGORY_LABELS.style}
           </span>
