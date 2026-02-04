@@ -86,6 +86,68 @@ function GeneralBadge({ categoryType }: { categoryType: 'approach' | 'style' | '
   );
 }
 
+// Constants for category display
+const MAX_VISIBLE_BADGES = 2;
+const SECTION_HEIGHT = 56; // pixels
+
+// Reusable category section component
+interface CategorySectionProps {
+  label: string;
+  items: string[];
+  categoryType: 'approach' | 'style' | 'areasOfFocus';
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+function CategorySection({ label, items, categoryType, isExpanded, onToggle }: CategorySectionProps) {
+  const hasItems = items && items.length > 0;
+  const visibleItems = isExpanded ? items : items.slice(0, MAX_VISIBLE_BADGES);
+  const hiddenCount = items.length - MAX_VISIBLE_BADGES;
+  const hasMore = hiddenCount > 0;
+
+  return (
+    <div
+      className={`${isExpanded ? '' : `h-[${SECTION_HEIGHT}px]`} overflow-hidden`}
+      style={isExpanded ? undefined : { height: `${SECTION_HEIGHT}px` }}
+    >
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+        {label}
+      </span>
+      <div className="flex flex-wrap gap-1.5 items-start content-start">
+        {hasItems ? (
+          <>
+            {visibleItems.map((item) => (
+              <CategoryBadge key={item} type={item} categoryType={categoryType} />
+            ))}
+            {hasMore && !isExpanded && (
+              <button
+                onClick={onToggle}
+                aria-expanded={false}
+                aria-label={`Show ${hiddenCount} more ${label.toLowerCase()} options`}
+                className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                +{hiddenCount}
+              </button>
+            )}
+            {hasMore && isExpanded && (
+              <button
+                onClick={onToggle}
+                aria-expanded={true}
+                aria-label={`Show fewer ${label.toLowerCase()} options`}
+                className="inline-block px-2 py-1 text-xs font-medium text-teal-600 hover:text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 rounded"
+              >
+                Less
+              </button>
+            )}
+          </>
+        ) : (
+          <GeneralBadge categoryType={categoryType} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 // Availability display component
 interface AvailabilityDisplayProps {
@@ -217,108 +279,30 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
           {therapist.name}
         </h3>
 
-        {/* Categories container - all sections limited to 1 row when collapsed (56px each: 18px label + 6px margin + 32px badges) */}
-        {/* Areas of Focus */}
-        <div className={`${isExpanded('areasOfFocus') ? '' : 'h-[56px]'} overflow-hidden`}>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
-            {CATEGORY_LABELS.areasOfFocus}
-          </span>
-          <div className="flex flex-wrap gap-1.5 items-start content-start">
-            {(therapist.areasOfFocus && therapist.areasOfFocus.length > 0) ? (
-              <>
-                {(isExpanded('areasOfFocus') ? therapist.areasOfFocus : therapist.areasOfFocus.slice(0, 2)).map((item) => (
-                  <CategoryBadge key={item} type={item} categoryType="areasOfFocus" />
-                ))}
-                {therapist.areasOfFocus.length > 2 && !isExpanded('areasOfFocus') && (
-                  <button
-                    onClick={() => toggleSection('areasOfFocus')}
-                    className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
-                  >
-                    +{therapist.areasOfFocus.length - 2}
-                  </button>
-                )}
-                {therapist.areasOfFocus.length > 2 && isExpanded('areasOfFocus') && (
-                  <button
-                    onClick={() => toggleSection('areasOfFocus')}
-                    className="inline-block px-2 py-1 text-xs font-medium text-teal-600 hover:text-teal-700"
-                  >
-                    Less
-                  </button>
-                )}
-              </>
-            ) : (
-              <GeneralBadge categoryType="areasOfFocus" />
-            )}
-          </div>
-        </div>
+        {/* Categories - using reusable CategorySection component */}
+        <CategorySection
+          label={CATEGORY_LABELS.areasOfFocus}
+          items={therapist.areasOfFocus || []}
+          categoryType="areasOfFocus"
+          isExpanded={isExpanded('areasOfFocus')}
+          onToggle={() => toggleSection('areasOfFocus')}
+        />
 
-        {/* Approach */}
-        <div className={`${isExpanded('approach') ? '' : 'h-[56px]'} overflow-hidden`}>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
-            {CATEGORY_LABELS.approach}
-          </span>
-          <div className="flex flex-wrap gap-1.5 items-start content-start">
-            {(therapist.approach && therapist.approach.length > 0) ? (
-              <>
-                {(isExpanded('approach') ? therapist.approach : therapist.approach.slice(0, 2)).map((item) => (
-                  <CategoryBadge key={item} type={item} categoryType="approach" />
-                ))}
-                {therapist.approach.length > 2 && !isExpanded('approach') && (
-                  <button
-                    onClick={() => toggleSection('approach')}
-                    className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
-                  >
-                    +{therapist.approach.length - 2}
-                  </button>
-                )}
-                {therapist.approach.length > 2 && isExpanded('approach') && (
-                  <button
-                    onClick={() => toggleSection('approach')}
-                    className="inline-block px-2 py-1 text-xs font-medium text-teal-600 hover:text-teal-700"
-                  >
-                    Less
-                  </button>
-                )}
-              </>
-            ) : (
-              <GeneralBadge categoryType="approach" />
-            )}
-          </div>
-        </div>
+        <CategorySection
+          label={CATEGORY_LABELS.approach}
+          items={therapist.approach || []}
+          categoryType="approach"
+          isExpanded={isExpanded('approach')}
+          onToggle={() => toggleSection('approach')}
+        />
 
-        {/* Style */}
-        <div className={`${isExpanded('style') ? '' : 'h-[56px]'} overflow-hidden`}>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
-            {CATEGORY_LABELS.style}
-          </span>
-          <div className="flex flex-wrap gap-1.5 items-start content-start">
-            {(therapist.style && therapist.style.length > 0) ? (
-              <>
-                {(isExpanded('style') ? therapist.style : therapist.style.slice(0, 2)).map((item) => (
-                  <CategoryBadge key={item} type={item} categoryType="style" />
-                ))}
-                {therapist.style.length > 2 && !isExpanded('style') && (
-                  <button
-                    onClick={() => toggleSection('style')}
-                    className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
-                  >
-                    +{therapist.style.length - 2}
-                  </button>
-                )}
-                {therapist.style.length > 2 && isExpanded('style') && (
-                  <button
-                    onClick={() => toggleSection('style')}
-                    className="inline-block px-2 py-1 text-xs font-medium text-teal-600 hover:text-teal-700"
-                  >
-                    Less
-                  </button>
-                )}
-              </>
-            ) : (
-              <GeneralBadge categoryType="style" />
-            )}
-          </div>
-        </div>
+        <CategorySection
+          label={CATEGORY_LABELS.style}
+          items={therapist.style || []}
+          categoryType="style"
+          isExpanded={isExpanded('style')}
+          onToggle={() => toggleSection('style')}
+        />
 
         {/* Bio - fixed height when collapsed */}
         <div className={`mt-4 pt-4 border-t border-slate-100 ${isExpanded('bio') ? '' : 'h-[100px] overflow-hidden'}`}>
@@ -328,7 +312,9 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
           {therapist.bio.length > 100 && (
             <button
               onClick={() => toggleSection('bio')}
-              className="text-sm font-medium text-teal-600 hover:text-teal-700 mt-1"
+              aria-expanded={isExpanded('bio')}
+              aria-label={isExpanded('bio') ? 'Show less of the bio' : 'Read more of the bio'}
+              className="text-sm font-medium text-teal-600 hover:text-teal-700 mt-1 focus:outline-none focus:ring-2 focus:ring-teal-500 rounded"
             >
               {isExpanded('bio') ? 'Show less' : 'Read more'}
             </button>
