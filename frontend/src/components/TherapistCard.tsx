@@ -53,6 +53,19 @@ function CategoryBadge({ type, categoryType }: CategoryBadgeProps) {
   );
 }
 
+// Fallback badge for when no categories are selected
+function GeneralBadge({ categoryType }: { categoryType: 'approach' | 'style' | 'areasOfFocus' }) {
+  const colorClass = CATEGORY_COLORS[categoryType];
+
+  return (
+    <span
+      className={`inline-block px-3 py-1 text-xs font-medium rounded-full border ${colorClass}`}
+    >
+      General
+    </span>
+  );
+}
+
 // Category section component
 interface CategorySectionProps {
   label: string;
@@ -62,22 +75,27 @@ interface CategorySectionProps {
 }
 
 function CategorySection({ label, items, categoryType, maxItems = 3 }: CategorySectionProps) {
-  if (!items || items.length === 0) return null;
-
-  const displayItems = items.slice(0, maxItems);
-  const remainingCount = items.length - maxItems;
+  const hasItems = items && items.length > 0;
+  const displayItems = hasItems ? items.slice(0, maxItems) : [];
+  const remainingCount = hasItems ? items.length - maxItems : 0;
 
   return (
     <div className="mb-2">
       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
       <div className="flex flex-wrap gap-1.5 mt-1">
-        {displayItems.map((item) => (
-          <CategoryBadge key={item} type={item} categoryType={categoryType} />
-        ))}
-        {remainingCount > 0 && (
-          <span className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full">
-            +{remainingCount}
-          </span>
+        {hasItems ? (
+          <>
+            {displayItems.map((item) => (
+              <CategoryBadge key={item} type={item} categoryType={categoryType} />
+            ))}
+            {remainingCount > 0 && (
+              <span className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full">
+                +{remainingCount}
+              </span>
+            )}
+          </>
+        ) : (
+          <GeneralBadge categoryType={categoryType} />
         )}
       </div>
     </div>
@@ -187,58 +205,33 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
     });
   };
 
-  // Check if we have new categories or need to fall back to specialisms
-  const hasNewCategories =
-    (therapist.approach?.length > 0) ||
-    (therapist.style?.length > 0) ||
-    (therapist.areasOfFocus?.length > 0);
-
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200">
       {/* Name and categories */}
       <div className="p-6">
         <h3 className="text-xl font-bold text-slate-900 break-words line-clamp-2">{therapist.name}</h3>
 
-        {/* New category system with tooltips */}
-        {hasNewCategories ? (
-          <div className="mt-4 space-y-2">
-            <CategorySection
-              label={CATEGORY_LABELS.areasOfFocus}
-              items={therapist.areasOfFocus}
-              categoryType="areasOfFocus"
-              maxItems={3}
-            />
-            <CategorySection
-              label={CATEGORY_LABELS.approach}
-              items={therapist.approach}
-              categoryType="approach"
-              maxItems={2}
-            />
-            <CategorySection
-              label={CATEGORY_LABELS.style}
-              items={therapist.style}
-              categoryType="style"
-              maxItems={2}
-            />
-          </div>
-        ) : (
-          /* Fallback to old specialisms for backwards compatibility */
-          <div className="flex flex-wrap gap-2 mt-3">
-            {therapist.specialisms?.slice(0, 4).map((specialism) => (
-              <span
-                key={specialism}
-                className="inline-block px-3 py-1 text-xs font-medium bg-teal-50 text-teal-700 rounded-full"
-              >
-                {specialism}
-              </span>
-            ))}
-            {therapist.specialisms?.length > 4 && (
-              <span className="inline-block px-3 py-1 text-xs font-medium bg-slate-100 text-slate-600 rounded-full">
-                +{therapist.specialisms.length - 4}
-              </span>
-            )}
-          </div>
-        )}
+        {/* Category system with tooltips - shows "General" fallback if empty */}
+        <div className="mt-4 space-y-2">
+          <CategorySection
+            label={CATEGORY_LABELS.areasOfFocus}
+            items={therapist.areasOfFocus || []}
+            categoryType="areasOfFocus"
+            maxItems={3}
+          />
+          <CategorySection
+            label={CATEGORY_LABELS.approach}
+            items={therapist.approach || []}
+            categoryType="approach"
+            maxItems={2}
+          />
+          <CategorySection
+            label={CATEGORY_LABELS.style}
+            items={therapist.style || []}
+            categoryType="style"
+            maxItems={2}
+          />
+        </div>
       </div>
 
       {/* Bio */}
