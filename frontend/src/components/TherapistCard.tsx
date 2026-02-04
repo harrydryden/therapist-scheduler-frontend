@@ -66,54 +66,6 @@ function GeneralBadge({ categoryType }: { categoryType: 'approach' | 'style' | '
   );
 }
 
-// Category section component with expandable overflow
-interface CategorySectionProps {
-  label: string;
-  items: string[];
-  categoryType: 'approach' | 'style' | 'areasOfFocus';
-  maxItems: number;
-  isExpanded: boolean;
-  onToggle: () => void;
-}
-
-function CategorySection({ label, items, categoryType, maxItems, isExpanded, onToggle }: CategorySectionProps) {
-  const hasItems = items && items.length > 0;
-  const displayItems = hasItems ? (isExpanded ? items : items.slice(0, maxItems)) : [];
-  const hasOverflow = hasItems && items.length > maxItems;
-
-  return (
-    <div>
-      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">{label}</span>
-      <div className="flex flex-wrap gap-1.5 items-center">
-        {hasItems ? (
-          <>
-            {displayItems.map((item) => (
-              <CategoryBadge key={item} type={item} categoryType={categoryType} />
-            ))}
-            {hasOverflow && !isExpanded && (
-              <button
-                onClick={onToggle}
-                className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
-              >
-                +{items.length - maxItems}
-              </button>
-            )}
-            {hasOverflow && isExpanded && (
-              <button
-                onClick={onToggle}
-                className="inline-block px-2 py-1 text-xs font-medium text-teal-600 hover:text-teal-700"
-              >
-                Show less
-              </button>
-            )}
-          </>
-        ) : (
-          <GeneralBadge categoryType={categoryType} />
-        )}
-      </div>
-    </div>
-  );
-}
 
 // Availability display component
 interface AvailabilityDisplayProps {
@@ -192,7 +144,7 @@ function AvailabilityDisplay({ availability, isExpanded, onToggle }: Availabilit
               onClick={onToggle}
               className="text-xs text-teal-600 hover:text-teal-700 font-medium"
             >
-              {isExpanded ? 'Show less' : `+${formattedSlots.length - MAX_AVAILABILITY_SLOTS} more days`}
+              {isExpanded ? 'Show less' : `+${formattedSlots.length - MAX_AVAILABILITY_SLOTS} more`}
             </button>
           )}
         </div>
@@ -237,52 +189,121 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200 flex flex-col h-full">
-      {/* Content area - grows to fill space */}
-      <div className="flex-1 flex flex-col">
-        {/* Name */}
-        <div className="px-6 pt-6 pb-2">
-          <h3 className="text-xl font-bold text-slate-900 break-words line-clamp-1">{therapist.name}</h3>
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200 flex flex-col">
+      {/* Main card content - uses flex-1 to fill available space */}
+      <div className="px-6 pt-6 pb-4 flex-1 flex flex-col">
+        {/* Name - fixed section */}
+        <h3 className="text-xl font-bold text-slate-900 break-words line-clamp-1 mb-4">
+          {therapist.name}
+        </h3>
+
+        {/* Categories container - each category is a distinct section */}
+        <div className="space-y-3">
+          {/* Areas of Focus */}
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+              {CATEGORY_LABELS.areasOfFocus}
+            </span>
+            <div className="flex flex-wrap gap-1.5 items-center min-h-[32px]">
+              {(therapist.areasOfFocus && therapist.areasOfFocus.length > 0) ? (
+                <>
+                  {(isExpanded('areasOfFocus') ? therapist.areasOfFocus : therapist.areasOfFocus.slice(0, 3)).map((item) => (
+                    <CategoryBadge key={item} type={item} categoryType="areasOfFocus" />
+                  ))}
+                  {therapist.areasOfFocus.length > 3 && !isExpanded('areasOfFocus') && (
+                    <button
+                      onClick={() => toggleSection('areasOfFocus')}
+                      className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
+                    >
+                      +{therapist.areasOfFocus.length - 3}
+                    </button>
+                  )}
+                  {therapist.areasOfFocus.length > 3 && isExpanded('areasOfFocus') && (
+                    <button
+                      onClick={() => toggleSection('areasOfFocus')}
+                      className="inline-block px-2 py-1 text-xs font-medium text-teal-600 hover:text-teal-700"
+                    >
+                      Less
+                    </button>
+                  )}
+                </>
+              ) : (
+                <GeneralBadge categoryType="areasOfFocus" />
+              )}
+            </div>
+          </div>
+
+          {/* Approach */}
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+              {CATEGORY_LABELS.approach}
+            </span>
+            <div className="flex flex-wrap gap-1.5 items-center min-h-[32px]">
+              {(therapist.approach && therapist.approach.length > 0) ? (
+                <>
+                  {(isExpanded('approach') ? therapist.approach : therapist.approach.slice(0, 2)).map((item) => (
+                    <CategoryBadge key={item} type={item} categoryType="approach" />
+                  ))}
+                  {therapist.approach.length > 2 && !isExpanded('approach') && (
+                    <button
+                      onClick={() => toggleSection('approach')}
+                      className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
+                    >
+                      +{therapist.approach.length - 2}
+                    </button>
+                  )}
+                  {therapist.approach.length > 2 && isExpanded('approach') && (
+                    <button
+                      onClick={() => toggleSection('approach')}
+                      className="inline-block px-2 py-1 text-xs font-medium text-teal-600 hover:text-teal-700"
+                    >
+                      Less
+                    </button>
+                  )}
+                </>
+              ) : (
+                <GeneralBadge categoryType="approach" />
+              )}
+            </div>
+          </div>
+
+          {/* Style */}
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+              {CATEGORY_LABELS.style}
+            </span>
+            <div className="flex flex-wrap gap-1.5 items-center min-h-[32px]">
+              {(therapist.style && therapist.style.length > 0) ? (
+                <>
+                  {(isExpanded('style') ? therapist.style : therapist.style.slice(0, 2)).map((item) => (
+                    <CategoryBadge key={item} type={item} categoryType="style" />
+                  ))}
+                  {therapist.style.length > 2 && !isExpanded('style') && (
+                    <button
+                      onClick={() => toggleSection('style')}
+                      className="inline-block px-2 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
+                    >
+                      +{therapist.style.length - 2}
+                    </button>
+                  )}
+                  {therapist.style.length > 2 && isExpanded('style') && (
+                    <button
+                      onClick={() => toggleSection('style')}
+                      className="inline-block px-2 py-1 text-xs font-medium text-teal-600 hover:text-teal-700"
+                    >
+                      Less
+                    </button>
+                  )}
+                </>
+              ) : (
+                <GeneralBadge categoryType="style" />
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Areas of Focus */}
-        <div className="px-6 py-2">
-          <CategorySection
-            label={CATEGORY_LABELS.areasOfFocus}
-            items={therapist.areasOfFocus || []}
-            categoryType="areasOfFocus"
-            maxItems={3}
-            isExpanded={isExpanded('areasOfFocus')}
-            onToggle={() => toggleSection('areasOfFocus')}
-          />
-        </div>
-
-        {/* Approach */}
-        <div className="px-6 py-2">
-          <CategorySection
-            label={CATEGORY_LABELS.approach}
-            items={therapist.approach || []}
-            categoryType="approach"
-            maxItems={2}
-            isExpanded={isExpanded('approach')}
-            onToggle={() => toggleSection('approach')}
-          />
-        </div>
-
-        {/* Style */}
-        <div className="px-6 py-2">
-          <CategorySection
-            label={CATEGORY_LABELS.style}
-            items={therapist.style || []}
-            categoryType="style"
-            maxItems={2}
-            isExpanded={isExpanded('style')}
-            onToggle={() => toggleSection('style')}
-          />
-        </div>
-
-        {/* Bio */}
-        <div className="px-6 py-3">
+        {/* Bio - separate section with top margin */}
+        <div className="mt-4 pt-4 border-t border-slate-100">
           <p className="text-sm text-slate-600 leading-relaxed">
             {isExpanded('bio')
               ? therapist.bio
@@ -298,10 +319,12 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
           )}
         </div>
 
-        {/* Availability Section */}
-        <div className="px-6 py-3 mt-auto">
-          <div className="pt-3 border-t border-slate-100">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block">Indicative Availability</span>
+        {/* Availability - pushed to bottom with mt-auto */}
+        <div className="mt-auto pt-4">
+          <div className="pt-4 border-t border-slate-100">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block">
+              Indicative Availability
+            </span>
             <p className="text-xs text-slate-400 mt-0.5 mb-2">More times available upon request</p>
             <AvailabilityDisplay
               availability={therapist.availability}
@@ -313,7 +336,7 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
       </div>
 
       {/* Booking Form - always at bottom */}
-      <div className="border-t border-slate-100 p-6 bg-slate-50">
+      <div className="border-t border-slate-100 p-6 bg-slate-50 mt-auto">
         {mutation.isSuccess ? (
           <div className="text-center py-2">
             <div className="inline-flex items-center justify-center w-12 h-12 bg-teal-100 rounded-full mb-3">
