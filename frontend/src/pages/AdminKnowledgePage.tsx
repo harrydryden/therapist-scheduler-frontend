@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getKnowledgeEntries,
@@ -25,6 +25,7 @@ export default function AdminKnowledgePage() {
   const queryClient = useQueryClient();
   const [editingEntry, setEditingEntry] = useState<KnowledgeEntry | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -76,12 +77,24 @@ export default function AdminKnowledgePage() {
     setIsCreating(false);
   };
 
+  const scrollToForm = () => {
+    // Use setTimeout to ensure React has rendered the form before scrolling
+    setTimeout(() => {
+      if (formRef.current) {
+        formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 50);
+  };
+
   const handleEdit = (entry: KnowledgeEntry) => {
     setEditingEntry(entry);
     setTitle(entry.title || '');
     setContent(entry.content);
     setAudience(entry.audience as KnowledgeAudience);
     setIsCreating(false);
+    scrollToForm();
   };
 
   const handleCreate = () => {
@@ -90,6 +103,7 @@ export default function AdminKnowledgePage() {
     setTitle('');
     setContent('');
     setAudience('both');
+    scrollToForm();
   };
 
   const handleSubmit = () => {
@@ -142,7 +156,12 @@ export default function AdminKnowledgePage() {
           </div>
           {!isFormOpen && (
             <button
-              onClick={handleCreate}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleCreate();
+              }}
               className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors font-medium"
             >
               + Add Entry
@@ -161,7 +180,7 @@ export default function AdminKnowledgePage() {
 
         {/* Create/Edit Form */}
         {isFormOpen && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6">
+          <div ref={formRef} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-slate-900 mb-4">
               {editingEntry ? 'Edit Entry' : 'New Entry'}
             </h2>
@@ -221,13 +240,21 @@ export default function AdminKnowledgePage() {
             {/* Actions */}
             <div className="flex gap-3">
               <button
-                onClick={resetForm}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  resetForm();
+                }}
                 className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleSubmit}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSubmit();
+                }}
                 disabled={!content.trim() || isPending}
                 className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50 font-medium"
               >
@@ -298,7 +325,12 @@ export default function AdminKnowledgePage() {
                     </span>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleToggleActive(entry)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleToggleActive(entry);
+                        }}
                         aria-label={entry.active ? `Deactivate ${entry.title || 'entry'}` : `Activate ${entry.title || 'entry'}`}
                         className={`px-3 py-1 text-xs rounded border transition-colors ${
                           entry.active
@@ -309,14 +341,24 @@ export default function AdminKnowledgePage() {
                         {entry.active ? 'Deactivate' : 'Activate'}
                       </button>
                       <button
-                        onClick={() => handleEdit(entry)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleEdit(entry);
+                        }}
                         aria-label={`Edit ${entry.title || 'entry'}`}
                         className="px-3 py-1 text-xs border border-slate-200 text-slate-600 rounded hover:bg-slate-50 transition-colors"
                       >
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(entry)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDelete(entry);
+                        }}
                         disabled={deleteMutation.isPending}
                         aria-label={`Delete ${entry.title || 'entry'}`}
                         className="px-3 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
