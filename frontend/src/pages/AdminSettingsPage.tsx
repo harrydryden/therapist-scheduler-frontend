@@ -35,6 +35,11 @@ const categoryInfo: Record<SettingCategory, { label: string; description: string
     description: 'Customize appointment confirmation and follow-up email content',
     icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
   },
+  weeklyMailing: {
+    label: 'Weekly Mailing',
+    description: 'Configure automated weekly promotional emails to subscribed users',
+    icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+  },
 };
 
 // Get a persistent admin ID for this browser session
