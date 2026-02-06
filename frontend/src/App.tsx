@@ -4,6 +4,7 @@ import TherapistDetailPage from './pages/TherapistDetailPage';
 import AdminIngestionPage from './pages/AdminIngestionPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminKnowledgePage from './pages/AdminKnowledgePage';
+import AdminSettingsPage from './pages/AdminSettingsPage';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -17,6 +18,7 @@ function App() {
           <Route path="/admin/ingestion" element={<AdminIngestionPage />} />
           <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
           <Route path="/admin/knowledge" element={<AdminKnowledgePage />} />
+          <Route path="/admin/settings" element={<AdminSettingsPage />} />
         </Routes>
       </Layout>
     </ErrorBoundary>

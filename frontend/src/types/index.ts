@@ -204,3 +204,38 @@ export interface UpdateKnowledgeRequest {
   active?: boolean;
   sortOrder?: number;
 }
+
+// System Settings types
+export type SettingValueType = 'number' | 'boolean' | 'string' | 'json';
+export type SettingCategory = 'stale' | 'postBooking' | 'agent' | 'retention';
+
+export interface SystemSetting {
+  key: string;
+  value: string | number | boolean;
+  category: SettingCategory;
+  label: string;
+  description: string | null;
+  valueType: SettingValueType;
+  minValue: number | null;
+  maxValue: number | null;
+  defaultValue: string | number | boolean;
+  isDefault: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface SettingsResponse {
+  settings: SystemSetting[];
+  grouped: Record<SettingCategory, SystemSetting[]>;
+  categories: SettingCategory[];
+}
+
+export interface UpdateSettingRequest {
+  value: string | number | boolean;
+  adminId: string;
+}
+
+export interface BulkUpdateSettingsRequest {
+  settings: Array<{ key: string; value: string | number | boolean }>;
+  adminId: string;
+}
