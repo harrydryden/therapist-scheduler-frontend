@@ -46,9 +46,10 @@ USER nodeuser
 
 EXPOSE 3000
 
-# Health check using wget (alpine doesn't have curl by default)
+# FIX C1: Health check using Node.js (Alpine doesn't have wget/curl by default)
+# The health-check.js script makes an HTTP request to /health endpoint
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+  CMD node backend/dist/health-check.js || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "backend/dist/server.js"]

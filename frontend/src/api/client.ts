@@ -109,26 +109,74 @@ async function safeParseJson(response: Response): Promise<any> {
   }
 }
 
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
-  const response = await fetchWithRetry(
-    `${API_BASE}${endpoint}`,
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-      ...options,
-    },
-    TIMEOUTS.DEFAULT_MS
-  );
+/**
+ * FIX M3: Request deduplication to prevent concurrent duplicate requests
+ * Stores pending promises by request key to coalesce identical concurrent requests
+ */
+const pendingRequests = new Map<string, Promise<any>>();
 
-  const data = await safeParseJson(response);
+function getRequestKey(method: string, endpoint: string): string {
+  // For GET requests, use method:endpoint to deduplicate
+  // For mutations (POST, PUT, DELETE), return empty to skip deduplication
+  if (method === 'GET') {
+    return `GET:${endpoint}`;
+  }
+  // For mutations, we don't deduplicate - each should be sent
+  return '';
+}
 
-  if (!response.ok) {
-    throw new Error(data.error || 'An error occurred');
+async function fetchWithDedup<T>(
+  endpoint: string,
+  options: RequestInit & { timeoutMs?: number } = {},
+  fetchFn: () => Promise<T>
+): Promise<T> {
+  const method = options.method || 'GET';
+  const key = getRequestKey(method, endpoint);
+
+  // Only deduplicate GET requests
+  if (!key) {
+    return fetchFn();
   }
 
-  return data;
+  // If there's already a pending request for this key, return its promise
+  const pending = pendingRequests.get(key);
+  if (pending) {
+    return pending as Promise<T>;
+  }
+
+  // Create new request and store its promise
+  const promise = fetchFn().finally(() => {
+    // Clean up after request completes
+    pendingRequests.delete(key);
+  });
+
+  pendingRequests.set(key, promise);
+  return promise;
+}
+
+async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
+  // FIX M3: Use request deduplication for GET requests
+  return fetchWithDedup<ApiResponse<T>>(endpoint, options, async () => {
+    const response = await fetchWithRetry(
+      `${API_BASE}${endpoint}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+        ...options,
+      },
+      TIMEOUTS.DEFAULT_MS
+    );
+
+    const data = await safeParseJson(response);
+
+    if (!response.ok) {
+      throw new Error(data.error || 'An error occurred');
+    }
+
+    return data;
+  });
 }
 
 export async function getTherapists(): Promise<Therapist[]> {
@@ -252,26 +300,33 @@ export async function createTherapistFromCV(file: File | null, adminNotes: Admin
 // For now, this provides basic protection for internal tools.
 
 async function fetchAdminApi<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T> & { pagination?: PaginationInfo; total?: number }> {
-  const response = await fetchWithTimeout(
-    `${API_BASE}${endpoint}`,
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        [HEADERS.WEBHOOK_SECRET]: ADMIN_SECRET,
-        ...options?.headers,
-      },
-      ...options,
-    },
-    TIMEOUTS.DEFAULT_MS
+  // FIX M3: Use request deduplication for GET requests
+  return fetchWithDedup<ApiResponse<T> & { pagination?: PaginationInfo; total?: number }>(
+    endpoint,
+    options,
+    async () => {
+      const response = await fetchWithTimeout(
+        `${API_BASE}${endpoint}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            [HEADERS.WEBHOOK_SECRET]: ADMIN_SECRET,
+            ...options?.headers,
+          },
+          ...options,
+        },
+        TIMEOUTS.DEFAULT_MS
+      );
+
+      const data = await safeParseJson(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'An error occurred');
+      }
+
+      return data;
+    }
   );
-
-  const data = await safeParseJson(response);
-
-  if (!response.ok) {
-    throw new Error(data.error || 'An error occurred');
-  }
-
-  return data;
 }
 
 export async function getAppointments(filters: AppointmentFilters = {}): Promise<{

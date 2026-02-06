@@ -362,33 +362,39 @@ export default function AdminDashboardPage() {
               </p>
             </div>
 
-            {/* Pagination Controls */}
-            {appointmentsData && appointmentsData.pagination.total > (filters.limit ?? 20) && (
+            {/* FIX M6: Pagination Controls - Always show when there are results */}
+            {appointmentsData && appointmentsData.pagination.total > 0 && (
               <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                 <span className="text-sm text-slate-600">
-                  Showing {(((filters.page ?? 1) - 1) * (filters.limit ?? 20)) + 1}-{Math.min((filters.page ?? 1) * (filters.limit ?? 20), appointmentsData.pagination.total)} of {appointmentsData.pagination.total}
+                  {appointmentsData.pagination.total <= (filters.limit ?? 20) ? (
+                    `Showing all ${appointmentsData.pagination.total} appointment${appointmentsData.pagination.total !== 1 ? 's' : ''}`
+                  ) : (
+                    `Showing ${(((filters.page ?? 1) - 1) * (filters.limit ?? 20)) + 1}-${Math.min((filters.page ?? 1) * (filters.limit ?? 20), appointmentsData.pagination.total)} of ${appointmentsData.pagination.total}`
+                  )}
                 </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setFilters(prev => ({ ...prev, page: (prev.page ?? 1) - 1 }))}
-                    disabled={(filters.page ?? 1) <= 1}
-                    aria-label="Previous page"
-                    className="px-3 py-1 text-sm border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    ← Prev
-                  </button>
-                  <span className="px-3 py-1 text-sm text-slate-600">
-                    Page {filters.page ?? 1} of {Math.ceil(appointmentsData.pagination.total / (filters.limit ?? 20))}
-                  </span>
-                  <button
-                    onClick={() => setFilters(prev => ({ ...prev, page: (prev.page ?? 1) + 1 }))}
-                    disabled={(filters.page ?? 1) >= Math.ceil(appointmentsData.pagination.total / (filters.limit ?? 20))}
-                    aria-label="Next page"
-                    className="px-3 py-1 text-sm border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next →
-                  </button>
-                </div>
+                {appointmentsData.pagination.total > (filters.limit ?? 20) && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setFilters(prev => ({ ...prev, page: (prev.page ?? 1) - 1 }))}
+                      disabled={(filters.page ?? 1) <= 1}
+                      aria-label="Previous page"
+                      className="px-3 py-1 text-sm border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="px-3 py-1 text-sm text-slate-600">
+                      Page {filters.page ?? 1} of {Math.ceil(appointmentsData.pagination.total / (filters.limit ?? 20))}
+                    </span>
+                    <button
+                      onClick={() => setFilters(prev => ({ ...prev, page: (prev.page ?? 1) + 1 }))}
+                      disabled={(filters.page ?? 1) >= Math.ceil(appointmentsData.pagination.total / (filters.limit ?? 20))}
+                      aria-label="Next page"
+                      className="px-3 py-1 text-sm border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

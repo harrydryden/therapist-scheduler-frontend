@@ -8,7 +8,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.railway.app https://*.vercel.app; frame-ancestors 'self' https://*.notion.so https://notion.so https://*.notion.site https://notion.site"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https:; connect-src 'self' https://therapist-scheduler-backend-production.up.railway.app https://spill-frontend.vercel.app; frame-ancestors 'self'"
         },
         {
           "key": "X-Content-Type-Options",
