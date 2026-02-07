@@ -5,6 +5,11 @@ import type { SystemSetting, SettingCategory } from '../types';
 
 // Category display info
 const categoryInfo: Record<SettingCategory, { label: string; description: string; icon: string }> = {
+  frontend: {
+    label: 'Frontend Content',
+    description: 'Customize content displayed on the public booking pages',
+    icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z',
+  },
   general: {
     label: 'General',
     description: 'General application settings including timezone configuration',
@@ -266,20 +271,22 @@ export default function AdminSettingsPage() {
                                   <option value="true">Enabled</option>
                                   <option value="false">Disabled</option>
                                 </select>
-                              ) : setting.key.endsWith('Body') ? (
-                                /* Multi-line textarea for email body templates */
+                              ) : setting.key.endsWith('Body') || setting.category === 'frontend' ? (
+                                /* Multi-line textarea for email body templates and frontend content */
                                 <div className="w-full">
                                   <textarea
                                     value={editValue}
                                     onChange={(e) => setEditValue(e.target.value)}
-                                    rows={12}
+                                    rows={setting.category === 'frontend' ? 16 : 12}
                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none resize-y"
-                                    placeholder="Email template body..."
+                                    placeholder={setting.category === 'frontend' ? "Markdown content..." : "Email template body..."}
                                   />
                                   <p className="text-xs text-slate-500 mt-1">
-                                    {setting.description?.match(/Variables: (.+)/)?.[1] && (
+                                    {setting.category === 'frontend' ? (
+                                      <>Supports Markdown formatting: <code className="bg-slate-100 px-1 rounded">**bold**</code>, <code className="bg-slate-100 px-1 rounded">### headings</code></>
+                                    ) : setting.description?.match(/Variables: (.+)/)?.[1] ? (
                                       <>Available variables: <code className="bg-slate-100 px-1 rounded">{setting.description.match(/Variables: (.+)/)?.[1]}</code></>
-                                    )}
+                                    ) : null}
                                   </p>
                                 </div>
                               ) : (
@@ -322,16 +329,16 @@ export default function AdminSettingsPage() {
                               </div>
                             </div>
                           ) : (
-                            <div className={`mt-2 ${setting.key.endsWith('Body') ? '' : 'flex items-center gap-3'}`}>
-                              {setting.key.endsWith('Body') ? (
-                                /* Email body template preview */
+                            <div className={`mt-2 ${setting.key.endsWith('Body') || setting.category === 'frontend' ? '' : 'flex items-center gap-3'}`}>
+                              {setting.key.endsWith('Body') || setting.category === 'frontend' ? (
+                                /* Email body template or frontend content preview */
                                 <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
                                   <pre className="text-sm font-mono text-slate-600 whitespace-pre-wrap max-h-32 overflow-y-auto">
                                     {String(setting.value).slice(0, 300)}{String(setting.value).length > 300 ? '...' : ''}
                                   </pre>
                                   {!setting.isDefault && (
                                     <p className="text-xs text-amber-600 mt-2">
-                                      ✎ Customized (click Edit to see full template)
+                                      ✎ Customized (click Edit to see full content)
                                     </p>
                                   )}
                                 </div>

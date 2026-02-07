@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getTherapists } from '../api/client';
+import ReactMarkdown from 'react-markdown';
+import { getTherapists, getFrontendSettings } from '../api/client';
 import TherapistCard from '../components/TherapistCard';
 import FilterBar from '../components/FilterBar';
 
@@ -15,6 +16,15 @@ export default function TherapistsPage() {
     queryKey: ['therapists'],
     queryFn: getTherapists,
   });
+
+  // Fetch frontend settings for intro text
+  const { data: frontendSettings } = useQuery({
+    queryKey: ['frontendSettings'],
+    queryFn: getFrontendSettings,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  const introText = frontendSettings?.['frontend.therapistPageIntro'] || '';
 
   // Filter to only show active therapists
   const activeTherapists = useMemo(() => {
@@ -79,6 +89,13 @@ export default function TherapistsPage() {
 
   return (
     <div>
+      {/* Introduction Text - from admin settings */}
+      {introText && (
+        <div className="mb-8 prose prose-slate max-w-none prose-headings:text-slate-900 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-p:text-slate-600 prose-p:leading-relaxed prose-strong:text-slate-900">
+          <ReactMarkdown>{introText}</ReactMarkdown>
+        </div>
+      )}
+
       {/* Filter Bar - Areas of Focus */}
       {areasOfFocusOptions.length > 0 && (
         <FilterBar

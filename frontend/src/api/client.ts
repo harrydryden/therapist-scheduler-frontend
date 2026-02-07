@@ -542,3 +542,16 @@ export async function resetSetting(
   }
   return response.data;
 }
+
+// Public Frontend Settings (no auth required)
+export interface FrontendSettings {
+  'frontend.therapistPageIntro': string;
+}
+
+export async function getFrontendSettings(): Promise<FrontendSettings> {
+  const response = await fetchApi<FrontendSettings>('/settings/frontend');
+  if (!response.data) {
+    throw new Error('Failed to fetch frontend settings');
+  }
+  return response.data;
+}
