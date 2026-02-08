@@ -892,18 +892,18 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Top Therapists */}
-        {stats && stats.topTherapists.length > 0 && (
+        {/* Top Users */}
+        {stats && stats.topUsers && stats.topUsers.length > 0 && (
           <div className="mt-8 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-            <h2 className="font-semibold text-slate-900 mb-4">Top Therapists by Bookings</h2>
+            <h2 className="font-semibold text-slate-900 mb-4">Top Users by Bookings</h2>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {stats.topTherapists.slice(0, 5).map((therapist, idx) => (
-                <div key={therapist.notionId} className="text-center">
+              {stats.topUsers.slice(0, 5).map((user, idx) => (
+                <div key={user.email} className="text-center">
                   <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2">
                     <span className="text-lg font-bold text-slate-600">#{idx + 1}</span>
                   </div>
-                  <p className="font-medium text-slate-900 text-sm">{therapist.name}</p>
-                  <p className="text-xs text-slate-500">{therapist.bookingCount} bookings</p>
+                  <p className="font-medium text-slate-900 text-sm">{user.name}</p>
+                  <p className="text-xs text-slate-500">{user.bookingCount} bookings</p>
                 </div>
               ))}
             </div>

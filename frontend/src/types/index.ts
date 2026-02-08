@@ -153,9 +153,9 @@ export interface DashboardStats {
   byStatus: Record<string, number>;
   confirmedLast7Days: number;
   totalRequests: number;
-  topTherapists: Array<{
+  topUsers: Array<{
     name: string;
-    notionId: string;
+    email: string;
     bookingCount: number;
   }>;
 }
