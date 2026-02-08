@@ -1,11 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="50" fill="#0f2a4a"/>
-  <path d="M50 15 C65 15, 80 35, 80 55 C80 75, 65 85, 50 85 C35 85, 20 75, 20 55 C20 35, 35 25, 40 25 C45 25, 45 30, 42 35 C38 42, 32 50, 32 60 C32 68, 38 72, 45 72"
-        fill="#2dd4bf"
-        stroke="none"/>
-  <path d="M32 60 C32 68, 38 74, 48 74"
+  <!-- Dark navy circular background -->
+  <circle cx="50" cy="50" r="50" fill="#0B1D3A"/>
+
+  <!-- Teal droplet with curled tail pointing up-left -->
+  <path d="M52 16
+           C42 14, 32 20, 28 28
+           C22 40, 22 56, 28 68
+           C36 82, 54 88, 68 82
+           C82 74, 86 56, 82 42
+           C78 28, 66 18, 52 16
+           Z"
+        fill="#2DD4BF"/>
+
+  <!-- Curled tail/hook at top -->
+  <path d="M52 16
+           C58 18, 60 24, 56 32
+           C52 40, 42 44, 36 50
+           C30 56, 30 66, 36 72"
+        fill="#2DD4BF"/>
+
+  <!-- Inner smile curve -->
+  <path d="M34 60
+           C36 70, 46 74, 54 70"
         fill="none"
-        stroke="#0f2a4a"
-        stroke-width="4"
+        stroke="#0B1D3A"
+        stroke-width="5"
         stroke-linecap="round"/>
 </svg>
