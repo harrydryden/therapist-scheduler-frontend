@@ -425,7 +425,7 @@ export async function sendAdminMessage(
 
 export async function deleteAppointment(
   appointmentId: string,
-  data: { adminId: string; reason?: string }
+  data: { adminId: string; reason?: string; forceDeleteConfirmed?: boolean }
 ): Promise<{ id: string; message: string }> {
   const response = await fetchAdminApi<{ id: string; message: string }>(
     `/admin/dashboard/appointments/${appointmentId}`,

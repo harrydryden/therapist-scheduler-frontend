@@ -53,6 +53,7 @@ export default function AdminDashboardPage() {
   // Delete appointment state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
+  const [forceDeleteConfirmed, setForceDeleteConfirmed] = useState(false);
 
   // Fetch appointments list with auto-refresh
   const {
@@ -212,8 +213,8 @@ export default function AdminDashboardPage() {
   });
 
   const deleteAppointmentMutation = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
-      deleteAppointment(id, { adminId: 'admin', reason }),
+    mutationFn: ({ id, reason, forceDeleteConfirmed: force }: { id: string; reason?: string; forceDeleteConfirmed?: boolean }) =>
+      deleteAppointment(id, { adminId: 'admin', reason, forceDeleteConfirmed: force }),
     onSuccess: () => {
       // Clear selection since appointment no longer exists
       setSelectedAppointment(null);
@@ -221,6 +222,7 @@ export default function AdminDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setShowDeleteConfirm(false);
       setDeleteReason('');
+      setForceDeleteConfirmed(false);
       setMutationError(null);
     },
     onError: (error) => {
@@ -761,64 +763,92 @@ export default function AdminDashboardPage() {
                     </div>
                   )}
 
-                  {/* Delete Appointment Section - Always visible for non-confirmed appointments */}
-                  {appointmentDetail.status !== 'confirmed' && (
-                    <div className="mt-4 pt-4 border-t border-slate-200">
-                      {!showDeleteConfirm ? (
-                        <button
-                          onClick={() => setShowDeleteConfirm(true)}
-                          aria-label="Show delete appointment confirmation"
-                          className="w-full px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium text-sm"
-                        >
-                          Delete Appointment
-                        </button>
-                      ) : (
-                        <div className="p-3 border border-red-200 rounded-lg bg-red-50">
-                          <h4 className="font-medium text-red-800 mb-2">⚠️ Delete Appointment?</h4>
-                          <p className="text-sm text-red-700 mb-3">
-                            This will permanently delete this appointment request and all conversation history.
-                            This action cannot be undone.
-                          </p>
-                          <div className="mb-3">
-                            <label className="text-sm text-red-700 block mb-1">Reason (optional):</label>
-                            <input
-                              type="text"
-                              value={deleteReason}
-                              onChange={(e) => setDeleteReason(e.target.value)}
-                              placeholder="Why are you deleting this appointment?"
-                              className="w-full px-3 py-2 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                            />
+                  {/* Delete Appointment Section */}
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    {!showDeleteConfirm ? (
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        aria-label="Show delete appointment confirmation"
+                        className="w-full px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium text-sm"
+                      >
+                        Delete Appointment
+                      </button>
+                    ) : (
+                      <div className="p-3 border border-red-200 rounded-lg bg-red-50">
+                        <h4 className="font-medium text-red-800 mb-2">⚠️ Delete Appointment?</h4>
+                        <p className="text-sm text-red-700 mb-3">
+                          This will permanently delete this appointment request and all conversation history.
+                          This action cannot be undone.
+                        </p>
+
+                        {/* Extra warning for confirmed appointments */}
+                        {appointmentDetail.status === 'confirmed' && (
+                          <div className="mb-3 p-2 bg-red-100 border border-red-300 rounded">
+                            <p className="text-sm text-red-800 font-medium mb-2">
+                              ⚠️ This is a CONFIRMED appointment!
+                            </p>
+                            <p className="text-xs text-red-700 mb-2">
+                              Deleting this will also unfreeze the therapist, allowing them to accept new bookings.
+                              Only delete if the session did NOT take place.
+                            </p>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={forceDeleteConfirmed}
+                                onChange={(e) => setForceDeleteConfirmed(e.target.checked)}
+                                className="w-4 h-4 text-red-600 border-red-300 rounded focus:ring-red-500"
+                              />
+                              <span className="text-sm text-red-800 font-medium">
+                                I confirm the session did NOT take place
+                              </span>
+                            </label>
                           </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setShowDeleteConfirm(false);
-                                setDeleteReason('');
-                              }}
-                              aria-label="Cancel deletion"
-                              className="flex-1 px-3 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-white transition-colors text-sm"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() =>
-                                deleteAppointmentMutation.mutate({
-                                  id: appointmentDetail.id,
-                                  reason: deleteReason || undefined,
-                                })
-                              }
-                              disabled={deleteAppointmentMutation.isPending}
-                              aria-label="Confirm permanent deletion of appointment"
-                              aria-busy={deleteAppointmentMutation.isPending}
-                              className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 text-sm font-medium"
-                            >
-                              {deleteAppointmentMutation.isPending ? 'Deleting...' : 'Yes, Delete'}
-                            </button>
-                          </div>
+                        )}
+
+                        <div className="mb-3">
+                          <label className="text-sm text-red-700 block mb-1">Reason (optional):</label>
+                          <input
+                            type="text"
+                            value={deleteReason}
+                            onChange={(e) => setDeleteReason(e.target.value)}
+                            placeholder="Why are you deleting this appointment?"
+                            className="w-full px-3 py-2 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                          />
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setShowDeleteConfirm(false);
+                              setDeleteReason('');
+                              setForceDeleteConfirmed(false);
+                            }}
+                            aria-label="Cancel deletion"
+                            className="flex-1 px-3 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-white transition-colors text-sm"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() =>
+                              deleteAppointmentMutation.mutate({
+                                id: appointmentDetail.id,
+                                reason: deleteReason || undefined,
+                                forceDeleteConfirmed: appointmentDetail.status === 'confirmed' ? true : undefined,
+                              })
+                            }
+                            disabled={
+                              deleteAppointmentMutation.isPending ||
+                              (appointmentDetail.status === 'confirmed' && !forceDeleteConfirmed)
+                            }
+                            aria-label="Confirm permanent deletion of appointment"
+                            aria-busy={deleteAppointmentMutation.isPending}
+                            className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 text-sm font-medium"
+                          >
+                            {deleteAppointmentMutation.isPending ? 'Deleting...' : 'Yes, Delete'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Conversation */}
