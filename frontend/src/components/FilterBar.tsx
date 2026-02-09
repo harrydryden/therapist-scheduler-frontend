@@ -25,7 +25,7 @@ const FilterBar = memo(function FilterBar({ categories, selectedCategory, onFilt
               onClick={() => onFilterChange(category)}
               aria-pressed={isSelected}
               aria-label={`Filter by ${category}${isSelected ? ' (selected, click to clear)' : ''}`}
-              className={`shrink-0 px-5 py-2 text-sm font-semibold rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-spill-blue focus:ring-offset-2 ${
+              className={`shrink-0 px-5 py-2 text-sm font-semibold rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-spill-blue-800 focus:ring-offset-2 ${
                 isSelected
                   ? 'bg-primary-600 text-white'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'

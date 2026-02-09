@@ -290,7 +290,7 @@ export default function AdminDashboardPage() {
                 type="checkbox"
                 checked={hideConfirmed}
                 onChange={(e) => setHideConfirmed(e.target.checked)}
-                className="w-4 h-4 text-spill-blue border-slate-300 rounded focus:ring-spill-blue"
+                className="w-4 h-4 text-spill-blue-800 border-slate-300 rounded focus:ring-spill-blue-800"
               />
               <span className="text-sm text-slate-700">Hide confirmed</span>
             </label>
@@ -300,7 +300,7 @@ export default function AdminDashboardPage() {
             <select
               value={filters.status || 'all'}
               onChange={(e) => handleFilterChange('status', e.target.value === 'all' ? '' : e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue focus:border-transparent outline-none"
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue-800 focus:border-transparent outline-none"
             >
               <option value="all">All Statuses</option>
               <option value="pending">Pending</option>
@@ -314,19 +314,19 @@ export default function AdminDashboardPage() {
               placeholder="From date"
               value={filters.dateFrom || ''}
               onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue focus:border-transparent outline-none"
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue-800 focus:border-transparent outline-none"
             />
             <input
               type="date"
               placeholder="To date"
               value={filters.dateTo || ''}
               onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue focus:border-transparent outline-none"
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue-800 focus:border-transparent outline-none"
             />
             <select
               value={filters.sortBy || 'updatedAt'}
               onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue focus:border-transparent outline-none"
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue-800 focus:border-transparent outline-none"
             >
               <option value="updatedAt">Sort by Updated</option>
               <option value="createdAt">Sort by Created</option>
@@ -394,7 +394,7 @@ export default function AdminDashboardPage() {
 
             {loadingList ? (
               <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-spill-blue mx-auto"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-spill-blue-800 mx-auto"></div>
                 <p className="text-sm text-slate-500 mt-2">Loading...</p>
               </div>
             ) : (
@@ -464,7 +464,7 @@ export default function AdminDashboardPage() {
                                 key={apt.id}
                                 onClick={() => setSelectedAppointment(apt.id)}
                                 className={`p-4 pl-8 cursor-pointer hover:bg-slate-100 transition-colors ${
-                                  selectedAppointment === apt.id ? 'bg-primary-50 border-l-4 border-l-spill-blue' : ''
+                                  selectedAppointment === apt.id ? 'bg-primary-50 border-l-4 border-l-spill-blue-800' : ''
                                 }`}
                               >
                                 <div className="flex justify-between items-start mb-1">
@@ -537,7 +537,7 @@ export default function AdminDashboardPage() {
               </div>
             ) : loadingDetail ? (
               <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-spill-blue mx-auto"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-spill-blue-800 mx-auto"></div>
                 <p className="text-sm text-slate-500 mt-2">Loading...</p>
               </div>
             ) : appointmentDetail ? (
@@ -660,7 +660,7 @@ export default function AdminDashboardPage() {
                         disabled={releaseControlMutation.isPending}
                         aria-label="Release human control and resume AI agent"
                         aria-busy={releaseControlMutation.isPending}
-                        className="w-full px-4 py-2 bg-spill-blue text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 font-medium"
+                        className="w-full px-4 py-2 bg-spill-blue-800 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 font-medium"
                       >
                         {releaseControlMutation.isPending
                           ? 'Resuming Agent...'
@@ -688,7 +688,7 @@ export default function AdminDashboardPage() {
                               onChange={(e) =>
                                 setMessageRecipient(e.target.value as 'client' | 'therapist')
                               }
-                              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue focus:border-transparent outline-none"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue-800 focus:border-transparent outline-none"
                             >
                               <option value="client">
                                 Client ({appointmentDetail.userEmail})
@@ -707,7 +707,7 @@ export default function AdminDashboardPage() {
                               value={messageSubject}
                               onChange={(e) => setMessageSubject(e.target.value)}
                               placeholder="Email subject"
-                              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue focus:border-transparent outline-none"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue-800 focus:border-transparent outline-none"
                             />
                           </div>
 
@@ -719,7 +719,7 @@ export default function AdminDashboardPage() {
                               onChange={(e) => setMessageBody(e.target.value)}
                               placeholder="Type your message..."
                               rows={4}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue focus:border-transparent outline-none resize-none"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue-800 focus:border-transparent outline-none resize-none"
                             />
                           </div>
 
@@ -745,7 +745,7 @@ export default function AdminDashboardPage() {
                               }
                               aria-label="Send message to recipient"
                               aria-busy={sendMessageMutation.isPending}
-                              className="flex-1 px-3 py-2 bg-spill-blue text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 text-sm font-medium"
+                              className="flex-1 px-3 py-2 bg-spill-blue-800 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 text-sm font-medium"
                             >
                               {sendMessageMutation.isPending ? 'Sending...' : 'Send'}
                             </button>

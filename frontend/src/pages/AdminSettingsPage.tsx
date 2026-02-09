@@ -169,8 +169,8 @@ export default function AdminSettingsPage() {
             aria-label="Show all settings categories"
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeCategory === 'all'
-                ? 'bg-spill-blue text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                ? 'bg-spill-blue-800 text-white'
+                : 'bg-white border border-spill-grey-200 text-spill-grey-600 hover:bg-spill-grey-100'
             }`}
           >
             All Settings
@@ -184,8 +184,8 @@ export default function AdminSettingsPage() {
               aria-label={`Filter to ${categoryInfo[cat]?.label || cat} settings`}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeCategory === cat
-                  ? 'bg-spill-blue text-white'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                  ? 'bg-spill-blue-800 text-white'
+                  : 'bg-white border border-spill-grey-200 text-spill-grey-600 hover:bg-spill-grey-100'
               }`}
             >
               {categoryInfo[cat]?.label || cat}
@@ -196,7 +196,7 @@ export default function AdminSettingsPage() {
         {/* Loading State */}
         {isLoading ? (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-spill-blue mx-auto"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-spill-grey-200 border-t-spill-blue-800 mx-auto"></div>
             <p className="text-sm text-slate-500 mt-2">Loading settings...</p>
           </div>
         ) : (
