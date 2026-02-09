@@ -167,10 +167,10 @@ export default function AdminSettingsPage() {
             onClick={() => setActiveCategory('all')}
             aria-pressed={activeCategory === 'all'}
             aria-label="Show all settings categories"
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${
               activeCategory === 'all'
-                ? 'bg-spill-blue-800 text-white'
-                : 'bg-white border border-spill-grey-200 text-spill-grey-600 hover:bg-spill-grey-100'
+                ? 'bg-spill-blue-200 text-spill-blue-900 border-spill-blue-200'
+                : 'bg-white border-spill-grey-200 text-spill-grey-600 hover:bg-spill-grey-100'
             }`}
           >
             All Settings
@@ -182,10 +182,10 @@ export default function AdminSettingsPage() {
               onClick={() => setActiveCategory(cat)}
               aria-pressed={activeCategory === cat}
               aria-label={`Filter to ${categoryInfo[cat]?.label || cat} settings`}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${
                 activeCategory === cat
-                  ? 'bg-spill-blue-800 text-white'
-                  : 'bg-white border border-spill-grey-200 text-spill-grey-600 hover:bg-spill-grey-100'
+                  ? 'bg-spill-blue-200 text-spill-blue-900 border-spill-blue-200'
+                  : 'bg-white border-spill-grey-200 text-spill-grey-600 hover:bg-spill-grey-100'
               }`}
             >
               {categoryInfo[cat]?.label || cat}
