@@ -414,7 +414,7 @@ export default function AdminDashboardPage() {
                           aria-expanded={expandedTherapists.has(group.therapistNotionId)}
                           aria-label={`${group.therapistName}: ${group.appointments.length} clients. ${expandedTherapists.has(group.therapistNotionId) ? 'Click to collapse' : 'Click to expand'}`}
                           className={`w-full p-4 text-left hover:bg-slate-50 transition-colors ${
-                            !group.hasConfirmed ? 'bg-amber-50' : ''
+                            !group.hasConfirmed ? 'bg-spill-yellow-100' : ''
                           }`}
                         >
                           <div className="flex justify-between items-start">
@@ -422,12 +422,12 @@ export default function AdminDashboardPage() {
                               <div className="flex items-center gap-2">
                                 <p className="font-semibold text-slate-900">{group.therapistName}</p>
                                 {!group.hasConfirmed && (
-                                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-200 text-amber-800">
+                                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-spill-yellow-200 text-spill-yellow-600">
                                     Needs booking
                                   </span>
                                 )}
                                 {group.hasConfirmed && (
-                                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-spill-teal-100 text-spill-teal-600">
                                     ✓ Has booking
                                   </span>
                                 )}

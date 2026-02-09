@@ -114,9 +114,9 @@ export const CATEGORY_LABELS = {
   areasOfFocus: 'Areas of Focus',
 } as const;
 
-// Category colors for badges
+// Category colors for badges (using Spill palette)
 export const CATEGORY_COLORS = {
-  approach: 'bg-violet-100 text-violet-800 border-violet-200',
-  style: 'bg-amber-100 text-amber-800 border-amber-200',
-  areasOfFocus: 'bg-primary-50 text-primary-900 border-primary-200',
+  approach: 'bg-spill-grey-100 text-spill-grey-600 border-spill-grey-200',
+  style: 'bg-spill-yellow-100 text-spill-yellow-600 border-spill-yellow-200',
+  areasOfFocus: 'bg-spill-blue-100 text-spill-blue-800 border-spill-blue-200',
 } as const;

@@ -337,7 +337,7 @@ export default function AdminSettingsPage() {
                                     {String(setting.value).slice(0, 300)}{String(setting.value).length > 300 ? '...' : ''}
                                   </pre>
                                   {!setting.isDefault && (
-                                    <p className="text-xs text-amber-600 mt-2">
+                                    <p className="text-xs text-spill-yellow-600 mt-2">
                                       ✎ Customized (click Edit to see full content)
                                     </p>
                                   )}

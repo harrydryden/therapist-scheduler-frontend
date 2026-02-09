@@ -790,7 +790,7 @@ export default function AdminIngestionPage() {
               <p className="text-sm text-slate-500 mt-1">
                 {additionalInfo.length.toLocaleString()} / 12,000 characters
                 {!file && additionalInfo.trim().length < 50 && (
-                  <span className="text-amber-600 ml-2">
+                  <span className="text-spill-yellow-600 ml-2">
                     (Minimum 50 characters required when no PDF is uploaded)
                   </span>
                 )}
