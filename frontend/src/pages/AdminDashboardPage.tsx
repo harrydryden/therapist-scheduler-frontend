@@ -10,9 +10,10 @@ import {
   sendAdminMessage,
   deleteAppointment,
 } from '../api/client';
-import type { AppointmentFilters, AppointmentListItem } from '../types';
+import type { AppointmentFilters, AppointmentListItem, HealthStatus } from '../types';
 import { APP } from '../config/constants';
-import { getStatusColor } from '../config/color-mappings';
+import { getStatusColor, getStageLabel } from '../config/color-mappings';
+import HealthStatusBadge from '../components/HealthStatusBadge';
 
 // Sanitize text content to prevent XSS
 function sanitizeText(text: string): string {
@@ -28,6 +29,9 @@ interface TherapistGroup {
   hasConfirmed: boolean;
   pendingCount: number;
   inProgressCount: number;
+  // Health aggregates
+  healthRed: number;
+  healthYellow: number;
 }
 
 export default function AdminDashboardPage() {
@@ -108,6 +112,8 @@ export default function AdminDashboardPage() {
           hasConfirmed: false,
           pendingCount: 0,
           inProgressCount: 0,
+          healthRed: 0,
+          healthYellow: 0,
         });
       }
       const group = groups.get(key)!;
@@ -119,6 +125,15 @@ export default function AdminDashboardPage() {
         group.pendingCount++;
       } else if (apt.status === 'contacted' || apt.status === 'negotiating') {
         group.inProgressCount++;
+      }
+
+      // Track health counts (only for non-terminal statuses)
+      if (apt.status !== 'confirmed' && apt.status !== 'cancelled') {
+        if (apt.healthStatus === 'red') {
+          group.healthRed++;
+        } else if (apt.healthStatus === 'yellow') {
+          group.healthYellow++;
+        }
       }
     }
 
@@ -134,9 +149,16 @@ export default function AdminDashboardPage() {
       }
     }
 
-    // Sort groups: those without any confirmed bookings first (need attention)
+    // Sort groups: prioritize those needing attention
     return Array.from(groups.values()).sort((a, b) => {
-      // First sort by whether they have confirmed (no confirmed = higher priority)
+      // First by health issues (red > yellow > green)
+      if (a.healthRed !== b.healthRed) {
+        return b.healthRed - a.healthRed;
+      }
+      if (a.healthYellow !== b.healthYellow) {
+        return b.healthYellow - a.healthYellow;
+      }
+      // Then by whether they have confirmed (no confirmed = higher priority)
       if (a.hasConfirmed !== b.hasConfirmed) {
         return a.hasConfirmed ? 1 : -1;
       }
@@ -281,6 +303,49 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
+        {/* Health Summary Cards */}
+        {appointmentsData?.data && appointmentsData.data.length > 0 && (
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {(() => {
+              const activeAppointments = appointmentsData.data.filter(
+                (apt) => apt.status !== 'confirmed' && apt.status !== 'cancelled'
+              );
+              const healthCounts = activeAppointments.reduce(
+                (acc, apt) => {
+                  acc[apt.healthStatus]++;
+                  return acc;
+                },
+                { green: 0, yellow: 0, red: 0 } as Record<HealthStatus, number>
+              );
+              return (
+                <>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-spill-teal-400">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 bg-spill-teal-400 rounded-full" />
+                      <p className="text-sm text-slate-500">Healthy</p>
+                    </div>
+                    <p className="text-2xl font-bold text-spill-teal-600">{healthCounts.green}</p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-spill-yellow-400">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 bg-spill-yellow-400 rounded-full" />
+                      <p className="text-sm text-slate-500">Monitoring</p>
+                    </div>
+                    <p className="text-2xl font-bold text-spill-yellow-600">{healthCounts.yellow}</p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-spill-red-400">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 bg-spill-red-400 rounded-full animate-pulse" />
+                      <p className="text-sm text-slate-500">Needs Attention</p>
+                    </div>
+                    <p className="text-2xl font-bold text-spill-red-600">{healthCounts.red}</p>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
         {/* Filters */}
         <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 mb-6">
           <div className="flex flex-wrap gap-4 items-center">
@@ -414,19 +479,29 @@ export default function AdminDashboardPage() {
                           aria-expanded={expandedTherapists.has(group.therapistNotionId)}
                           aria-label={`${group.therapistName}: ${group.appointments.length} clients. ${expandedTherapists.has(group.therapistNotionId) ? 'Click to collapse' : 'Click to expand'}`}
                           className={`w-full p-4 text-left hover:bg-slate-50 transition-colors ${
-                            !group.hasConfirmed ? 'bg-spill-yellow-100' : ''
+                            group.healthRed > 0 ? 'bg-spill-red-100' : !group.hasConfirmed ? 'bg-spill-yellow-100' : ''
                           }`}
                         >
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <p className="font-semibold text-slate-900">{group.therapistName}</p>
-                                {!group.hasConfirmed && (
+                                {group.healthRed > 0 && (
+                                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-spill-red-200 text-spill-red-600">
+                                    {group.healthRed} need attention
+                                  </span>
+                                )}
+                                {group.healthYellow > 0 && group.healthRed === 0 && (
+                                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-spill-yellow-200 text-spill-yellow-600">
+                                    {group.healthYellow} monitoring
+                                  </span>
+                                )}
+                                {!group.hasConfirmed && group.healthRed === 0 && (
                                   <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-spill-yellow-200 text-spill-yellow-600">
                                     Needs booking
                                   </span>
                                 )}
-                                {group.hasConfirmed && (
+                                {group.hasConfirmed && group.healthRed === 0 && group.healthYellow === 0 && (
                                   <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-spill-teal-100 text-spill-teal-600">
                                     ✓ Has booking
                                   </span>
@@ -468,13 +543,25 @@ export default function AdminDashboardPage() {
                                 }`}
                               >
                                 <div className="flex justify-between items-start mb-1">
-                                  <div>
-                                    <p className="font-medium text-slate-900">
-                                      {apt.userName || apt.userEmail}
-                                    </p>
-                                    <p className="text-xs text-slate-500">{apt.userEmail}</p>
+                                  <div className="flex items-start gap-2">
+                                    {/* Health indicator */}
+                                    <div className="pt-1.5">
+                                      <HealthStatusBadge status={apt.healthStatus} size="sm" />
+                                    </div>
+                                    <div>
+                                      <p className="font-medium text-slate-900">
+                                        {apt.userName || apt.userEmail}
+                                      </p>
+                                      <p className="text-xs text-slate-500">{apt.userEmail}</p>
+                                    </div>
                                   </div>
                                   <div className="flex flex-col gap-1 items-end">
+                                    {/* Progress indicator */}
+                                    {apt.status !== 'confirmed' && apt.status !== 'cancelled' && apt.checkpointProgress > 0 && (
+                                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-spill-blue-100 text-spill-blue-800">
+                                        {apt.checkpointProgress}%
+                                      </span>
+                                    )}
                                     <span
                                       className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(apt.status)}`}
                                     >
@@ -485,19 +572,43 @@ export default function AdminDashboardPage() {
                                         Human
                                       </span>
                                     )}
-                                    {apt.isStale && (
-                                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                                        ⚠️ 48h+ No Reply
-                                      </span>
-                                    )}
                                   </div>
                                 </div>
-                                <div className="flex gap-3 text-xs text-slate-500">
+                                {/* Stage label */}
+                                {apt.checkpointStage && apt.status !== 'confirmed' && apt.status !== 'cancelled' && (
+                                  <p className="text-xs text-slate-600 mb-1 pl-4">
+                                    Stage: {getStageLabel(apt.checkpointStage)}
+                                  </p>
+                                )}
+                                {/* Alert badges */}
+                                <div className="flex flex-wrap gap-1 mb-1 pl-4">
+                                  {apt.isStale && (
+                                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                                      Stale
+                                    </span>
+                                  )}
+                                  {apt.isStalled && (
+                                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
+                                      Stalled
+                                    </span>
+                                  )}
+                                  {apt.hasThreadDivergence && (
+                                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                                      Diverged
+                                    </span>
+                                  )}
+                                  {apt.hasToolFailure && (
+                                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                                      Tool Error
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex gap-3 text-xs text-slate-500 pl-4">
                                   <span>{apt.messageCount} msgs</span>
                                   <span>{new Date(apt.updatedAt).toLocaleDateString()}</span>
                                 </div>
                                 {apt.status === 'confirmed' && apt.confirmedDateTime && (
-                                  <p className="text-xs text-green-600 mt-1 font-medium">
+                                  <p className="text-xs text-green-600 mt-1 font-medium pl-4">
                                     Booked: {apt.confirmedDateTime}
                                   </p>
                                 )}

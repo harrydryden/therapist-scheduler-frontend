@@ -106,6 +106,20 @@ export interface AdminNotes {
   notes?: string;
 }
 
+// Conversation progress tracking types
+export type ConversationStage =
+  | 'initial_contact'
+  | 'awaiting_therapist_availability'
+  | 'awaiting_user_slot_selection'
+  | 'awaiting_therapist_confirmation'
+  | 'awaiting_meeting_link'
+  | 'confirmed'
+  | 'rescheduling'
+  | 'cancelled'
+  | 'stalled';
+
+export type HealthStatus = 'green' | 'yellow' | 'red';
+
 // Admin Dashboard types
 export interface AppointmentListItem {
   id: string;
@@ -124,6 +138,15 @@ export interface AppointmentListItem {
   humanControlTakenBy: string | null;
   lastActivityAt: string;
   isStale: boolean;
+  // Checkpoint data
+  checkpointStage: ConversationStage | null;
+  checkpointProgress: number;
+  // Health data
+  healthStatus: HealthStatus;
+  healthScore: number;
+  isStalled: boolean;
+  hasThreadDivergence: boolean;
+  hasToolFailure: boolean;
 }
 
 export interface AppointmentDetail extends Omit<AppointmentListItem, 'messageCount'> {

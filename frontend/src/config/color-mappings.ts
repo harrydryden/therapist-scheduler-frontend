@@ -41,6 +41,33 @@ export const TAG_COLORS = {
   stale: 'bg-spill-red-100 text-spill-red-600',
 } as const;
 
+// Health status colors (traffic light system)
+export const HEALTH_STATUS_COLORS: Record<string, string> = {
+  green: 'bg-spill-teal-400',
+  yellow: 'bg-spill-yellow-400',
+  red: 'bg-spill-red-400',
+} as const;
+
+// Health status badge colors (with text)
+export const HEALTH_BADGE_COLORS: Record<string, string> = {
+  green: 'bg-spill-teal-100 text-spill-teal-600',
+  yellow: 'bg-spill-yellow-100 text-spill-yellow-600',
+  red: 'bg-spill-red-100 text-spill-red-600',
+} as const;
+
+// Conversation stage labels (human-readable)
+export const STAGE_LABELS: Record<string, string> = {
+  initial_contact: 'Initial Contact',
+  awaiting_therapist_availability: 'Awaiting Availability',
+  awaiting_user_slot_selection: 'Awaiting User Selection',
+  awaiting_therapist_confirmation: 'Awaiting Confirmation',
+  awaiting_meeting_link: 'Awaiting Meeting Link',
+  confirmed: 'Confirmed',
+  rescheduling: 'Rescheduling',
+  cancelled: 'Cancelled',
+  stalled: 'Stalled',
+} as const;
+
 // Utility function to get status color with fallback
 export function getStatusColor(status: string): string {
   return STATUS_BADGE_COLORS[status] || 'bg-slate-100 text-slate-800';
@@ -49,4 +76,20 @@ export function getStatusColor(status: string): string {
 // Utility function to get audience color with fallback
 export function getAudienceColor(audience: string): string {
   return AUDIENCE_BADGE_COLORS[audience] || 'bg-slate-100 text-slate-800';
+}
+
+// Utility function to get health status color with fallback
+export function getHealthColor(status: string): string {
+  return HEALTH_STATUS_COLORS[status] || HEALTH_STATUS_COLORS.green;
+}
+
+// Utility function to get health badge color with fallback
+export function getHealthBadgeColor(status: string): string {
+  return HEALTH_BADGE_COLORS[status] || HEALTH_BADGE_COLORS.green;
+}
+
+// Utility function to get stage label with fallback
+export function getStageLabel(stage: string | null): string {
+  if (!stage) return 'Unknown';
+  return STAGE_LABELS[stage] || stage;
 }
