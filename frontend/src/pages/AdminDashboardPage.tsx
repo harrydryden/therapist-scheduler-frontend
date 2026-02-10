@@ -1008,7 +1008,9 @@ export default function AdminDashboardPage() {
                                 updateAppointmentMutation.mutate({
                                   id: appointmentDetail.id,
                                   status: editStatus || undefined,
-                                  confirmedDateTime: editStatus === 'confirmed' ? editConfirmedDateTime : null,
+                                  // Only send confirmedDateTime if status is confirmed, otherwise don't send it at all
+                                  // (undefined means "don't change", null would clear it)
+                                  confirmedDateTime: editStatus === 'confirmed' ? editConfirmedDateTime : undefined,
                                 });
                               }}
                               disabled={
