@@ -45,6 +45,7 @@ export default function AdminDashboardPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<string | null>(null);
   const [hideConfirmed, setHideConfirmed] = useState(true); // Default to hiding confirmed
   const [expandedTherapists, setExpandedTherapists] = useState<Set<string>>(new Set());
+  const [quickFilter, setQuickFilter] = useState<'red' | 'human' | null>(null);
 
   // Human control state
   const [showComposeMessage, setShowComposeMessage] = useState(false);
@@ -93,10 +94,20 @@ export default function AdminDashboardPage() {
   const therapistGroups = useMemo(() => {
     if (!appointmentsData?.data) return [];
 
+    // Apply filters
+    let filteredAppointments = appointmentsData.data;
+
     // Filter out confirmed if hideConfirmed is true
-    const filteredAppointments = hideConfirmed
-      ? appointmentsData.data.filter((apt) => apt.status !== 'confirmed')
-      : appointmentsData.data;
+    if (hideConfirmed) {
+      filteredAppointments = filteredAppointments.filter((apt) => apt.status !== 'confirmed');
+    }
+
+    // Apply quick filter
+    if (quickFilter === 'red') {
+      filteredAppointments = filteredAppointments.filter((apt) => apt.healthStatus === 'red');
+    } else if (quickFilter === 'human') {
+      filteredAppointments = filteredAppointments.filter((apt) => apt.humanControlEnabled);
+    }
 
     // Group by therapist
     const groups = new Map<string, TherapistGroup>();
@@ -169,7 +180,7 @@ export default function AdminDashboardPage() {
       // Then by in-progress count
       return b.inProgressCount - a.inProgressCount;
     });
-  }, [appointmentsData?.data, hideConfirmed]);
+  }, [appointmentsData?.data, hideConfirmed, quickFilter]);
 
   const toggleTherapistExpanded = (therapistId: string) => {
     setExpandedTherapists((prev) => {
@@ -340,6 +351,82 @@ export default function AdminDashboardPage() {
                     </div>
                     <p className="text-2xl font-bold text-spill-red-600">{healthCounts.red}</p>
                   </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Control Status Summary */}
+        {appointmentsData?.data && appointmentsData.data.length > 0 && (
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {(() => {
+              const activeAppointments = appointmentsData.data.filter(
+                (apt) => apt.status !== 'confirmed' && apt.status !== 'cancelled'
+              );
+              const humanControlCount = activeAppointments.filter((apt) => apt.humanControlEnabled).length;
+              const agentControlCount = activeAppointments.length - humanControlCount;
+              return (
+                <>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-spill-blue-800">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🤖</span>
+                      <p className="text-sm text-slate-500">Agent Control</p>
+                    </div>
+                    <p className="text-2xl font-bold text-spill-blue-800">{agentControlCount}</p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-orange-400">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">👤</span>
+                      <p className="text-sm text-slate-500">Human Control</p>
+                    </div>
+                    <p className="text-2xl font-bold text-orange-600">{humanControlCount}</p>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Quick Filters */}
+        {appointmentsData?.data && appointmentsData.data.length > 0 && (
+          <div className="flex gap-2 mb-4">
+            {(() => {
+              const activeAppointments = appointmentsData.data.filter(
+                (apt) => apt.status !== 'confirmed' && apt.status !== 'cancelled'
+              );
+              const redCount = activeAppointments.filter((apt) => apt.healthStatus === 'red').length;
+              const humanCount = activeAppointments.filter((apt) => apt.humanControlEnabled).length;
+              return (
+                <>
+                  <button
+                    onClick={() => setQuickFilter(quickFilter === 'red' ? null : 'red')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                      quickFilter === 'red'
+                        ? 'bg-spill-red-600 text-white'
+                        : 'bg-spill-red-100 text-spill-red-600 hover:bg-spill-red-200'
+                    }`}
+                  >
+                    Needs Attention ({redCount})
+                  </button>
+                  <button
+                    onClick={() => setQuickFilter(quickFilter === 'human' ? null : 'human')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                      quickFilter === 'human'
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
+                    }`}
+                  >
+                    Human Control ({humanCount})
+                  </button>
+                  {quickFilter && (
+                    <button
+                      onClick={() => setQuickFilter(null)}
+                      className="px-3 py-1.5 text-sm font-medium rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                    >
+                      Clear Filter
+                    </button>
+                  )}
                 </>
               );
             })()}
