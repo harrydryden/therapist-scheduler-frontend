@@ -13,6 +13,7 @@ import type {
   AppointmentFilters,
   TakeControlRequest,
   SendMessageRequest,
+  UpdateAppointmentRequest,
   KnowledgeEntry,
   CreateKnowledgeRequest,
   UpdateKnowledgeRequest,
@@ -436,6 +437,36 @@ export async function deleteAppointment(
   );
   if (!response.data) {
     throw new Error('Failed to delete appointment');
+  }
+  return response.data;
+}
+
+export async function updateAppointment(
+  appointmentId: string,
+  data: UpdateAppointmentRequest
+): Promise<{
+  id: string;
+  status: string;
+  confirmedDateTime: string | null;
+  confirmedAt: string | null;
+  updatedAt: string;
+  previousStatus?: string;
+  warning?: string;
+}> {
+  const response = await fetchAdminApi<{
+    id: string;
+    status: string;
+    confirmedDateTime: string | null;
+    confirmedAt: string | null;
+    updatedAt: string;
+    previousStatus?: string;
+    warning?: string;
+  }>(`/admin/dashboard/appointments/${appointmentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  if (!response.data) {
+    throw new Error('Failed to update appointment');
   }
   return response.data;
 }

@@ -207,6 +207,14 @@ export interface SendMessageRequest {
   adminId: string;
 }
 
+// Update appointment request (for manual status/time editing)
+export interface UpdateAppointmentRequest {
+  status?: 'pending' | 'contacted' | 'negotiating' | 'confirmed' | 'cancelled';
+  confirmedDateTime?: string | null;
+  adminId: string;
+  reason?: string;
+}
+
 // Knowledge Base types
 export type KnowledgeAudience = 'therapist' | 'user' | 'both';
 

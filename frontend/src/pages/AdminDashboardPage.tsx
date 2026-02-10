@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import DOMPurify from 'dompurify';
 import {
@@ -9,6 +9,7 @@ import {
   releaseControl,
   sendAdminMessage,
   deleteAppointment,
+  updateAppointment,
 } from '../api/client';
 import type { AppointmentFilters, AppointmentListItem, HealthStatus } from '../types';
 import { APP } from '../config/constants';
@@ -59,6 +60,12 @@ export default function AdminDashboardPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
   const [forceDeleteConfirmed, setForceDeleteConfirmed] = useState(false);
+
+  // Edit appointment state
+  const [showEditPanel, setShowEditPanel] = useState(false);
+  const [editStatus, setEditStatus] = useState<string | null>(null);
+  const [editConfirmedDateTime, setEditConfirmedDateTime] = useState('');
+  const [editWarning, setEditWarning] = useState<string | null>(null);
 
   // Fetch appointments list with auto-refresh
   const {
@@ -262,6 +269,45 @@ export default function AdminDashboardPage() {
       setMutationError(error instanceof Error ? error.message : 'Failed to delete appointment');
     },
   });
+
+  const updateAppointmentMutation = useMutation({
+    mutationFn: ({
+      id,
+      status,
+      confirmedDateTime,
+    }: {
+      id: string;
+      status?: string;
+      confirmedDateTime?: string | null;
+    }) =>
+      updateAppointment(id, {
+        status: status as 'pending' | 'contacted' | 'negotiating' | 'confirmed' | 'cancelled' | undefined,
+        confirmedDateTime,
+        adminId: 'admin',
+      }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['appointment', selectedAppointment] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      setShowEditPanel(false);
+      setMutationError(null);
+      if (data.warning) {
+        setEditWarning(data.warning);
+        setTimeout(() => setEditWarning(null), 5000);
+      }
+    },
+    onError: (error) => {
+      setMutationError(error instanceof Error ? error.message : 'Failed to update appointment');
+    },
+  });
+
+  // Sync edit form state when appointment detail loads
+  useEffect(() => {
+    if (appointmentDetail) {
+      setEditStatus(appointmentDetail.status);
+      setEditConfirmedDateTime(appointmentDetail.confirmedDateTime || '');
+    }
+  }, [appointmentDetail]);
 
   const handleSendMessage = () => {
     if (!appointmentDetail || !messageSubject.trim() || !messageBody.trim()) return;
@@ -837,6 +883,9 @@ export default function AdminDashboardPage() {
                           ? 'Taking Control...'
                           : 'Take Human Control (Pause Agent)'}
                       </button>
+                      <p className="text-xs text-slate-500 mt-2 text-center">
+                        Take control to edit status or confirmed time
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -867,6 +916,114 @@ export default function AdminDashboardPage() {
                           ? 'Resuming Agent...'
                           : 'Resume Agent (Release Control)'}
                       </button>
+
+                      {/* Edit Status / Confirmed Time Panel */}
+                      {!showEditPanel ? (
+                        <button
+                          onClick={() => setShowEditPanel(true)}
+                          aria-label="Edit appointment status and confirmed time"
+                          className="w-full px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors font-medium"
+                        >
+                          Edit Status / Confirmed Time
+                        </button>
+                      ) : (
+                        <div className="p-3 border border-slate-200 rounded-lg bg-white">
+                          <h4 className="font-medium text-slate-800 mb-2">Edit Appointment</h4>
+
+                          {/* Status Dropdown */}
+                          <div className="mb-2">
+                            <label className="text-sm text-slate-600 block mb-1">Status:</label>
+                            <select
+                              value={editStatus || ''}
+                              onChange={(e) => setEditStatus(e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue-800 focus:border-transparent outline-none"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="contacted">Contacted</option>
+                              <option value="negotiating">Negotiating</option>
+                              <option value="confirmed">Confirmed</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </div>
+
+                          {/* Confirmed DateTime (only shown when status is confirmed) */}
+                          {editStatus === 'confirmed' && (
+                            <div className="mb-2">
+                              <label className="text-sm text-slate-600 block mb-1">
+                                Confirmed Date/Time:
+                                <span className="text-red-500 ml-1">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={editConfirmedDateTime}
+                                onChange={(e) => setEditConfirmedDateTime(e.target.value)}
+                                placeholder="e.g., Tuesday 15th January at 2pm"
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-spill-blue-800 focus:border-transparent outline-none"
+                              />
+                              <p className="text-xs text-slate-500 mt-1">
+                                Enter the agreed appointment date and time
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Warning for unusual transitions */}
+                          {editStatus === 'pending' && appointmentDetail.status !== 'pending' && (
+                            <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                              <p className="text-xs text-yellow-800">
+                                ⚠️ Reverting to pending is unusual. Previous status: {appointmentDetail.status}
+                              </p>
+                            </div>
+                          )}
+                          {editStatus === 'cancelled' && appointmentDetail.status === 'confirmed' && (
+                            <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded">
+                              <p className="text-xs text-red-800">
+                                ⚠️ Cancelling a confirmed appointment. The therapist will be unfrozen.
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Edit warning from response */}
+                          {editWarning && (
+                            <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                              <p className="text-xs text-yellow-800">{editWarning}</p>
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setShowEditPanel(false);
+                                // Reset to original values
+                                setEditStatus(appointmentDetail.status);
+                                setEditConfirmedDateTime(appointmentDetail.confirmedDateTime || '');
+                              }}
+                              aria-label="Cancel edit"
+                              className="flex-1 px-3 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => {
+                                updateAppointmentMutation.mutate({
+                                  id: appointmentDetail.id,
+                                  status: editStatus || undefined,
+                                  confirmedDateTime: editStatus === 'confirmed' ? editConfirmedDateTime : null,
+                                });
+                              }}
+                              disabled={
+                                updateAppointmentMutation.isPending ||
+                                (editStatus === 'confirmed' && !editConfirmedDateTime.trim())
+                              }
+                              aria-label="Save appointment changes"
+                              aria-busy={updateAppointmentMutation.isPending}
+                              className="flex-1 px-3 py-2 bg-spill-blue-800 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 text-sm font-medium"
+                            >
+                              {updateAppointmentMutation.isPending ? 'Saving...' : 'Save Changes'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Compose Message Toggle */}
                       {!showComposeMessage ? (
