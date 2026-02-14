@@ -1045,6 +1045,9 @@ export default function AdminDashboardPage() {
                               <option value="contacted">Contacted</option>
                               <option value="negotiating">Negotiating</option>
                               <option value="confirmed">Confirmed</option>
+                              <option value="session_held">Session Held</option>
+                              <option value="feedback_requested">Feedback Requested</option>
+                              <option value="completed">Completed</option>
                               <option value="cancelled">Cancelled</option>
                             </select>
                           </div>

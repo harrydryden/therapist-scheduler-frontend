@@ -208,8 +208,9 @@ export interface SendMessageRequest {
 }
 
 // Update appointment request (for manual status/time editing)
+// Full lifecycle: pending → contacted → negotiating → confirmed → session_held → feedback_requested → completed
 export interface UpdateAppointmentRequest {
-  status?: 'pending' | 'contacted' | 'negotiating' | 'confirmed' | 'cancelled';
+  status?: 'pending' | 'contacted' | 'negotiating' | 'confirmed' | 'session_held' | 'feedback_requested' | 'completed' | 'cancelled';
   confirmedDateTime?: string | null;
   adminId: string;
   reason?: string;
