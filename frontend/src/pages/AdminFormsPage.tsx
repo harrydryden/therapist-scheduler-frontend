@@ -92,11 +92,11 @@ async function fetchAdminApi<T>(endpoint: string, options?: RequestInit): Promis
 }
 
 async function getFormConfig(): Promise<FormConfig> {
-  return fetchAdminApi<FormConfig>('/api/admin/forms/feedback');
+  return fetchAdminApi<FormConfig>('/admin/forms/feedback');
 }
 
 async function updateFormConfig(updates: Partial<FormConfig>): Promise<FormConfig> {
-  return fetchAdminApi<FormConfig>('/api/admin/forms/feedback', {
+  return fetchAdminApi<FormConfig>('/admin/forms/feedback', {
     method: 'PUT',
     body: JSON.stringify(updates),
   });
@@ -115,11 +115,11 @@ async function getSubmissions(params?: {
   if (params?.limit) queryParams.set('limit', String(params.limit));
   if (params?.therapist) queryParams.set('therapist', params.therapist);
 
-  return fetchAdminApi(`/api/admin/forms/feedback/submissions?${queryParams.toString()}`);
+  return fetchAdminApi(`/admin/forms/feedback/submissions?${queryParams.toString()}`);
 }
 
 async function getStats(): Promise<FeedbackStats> {
-  return fetchAdminApi<FeedbackStats>('/api/admin/forms/feedback/stats');
+  return fetchAdminApi<FeedbackStats>('/admin/forms/feedback/stats');
 }
 
 // ============================================
