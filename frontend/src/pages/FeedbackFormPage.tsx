@@ -50,8 +50,8 @@ interface FeedbackFormResponse {
 
 async function getFeedbackForm(splCode?: string): Promise<FeedbackFormResponse> {
   const endpoint = splCode
-    ? `${API_BASE}/api/feedback/form/${splCode}`
-    : `${API_BASE}/api/feedback/form`;
+    ? `${API_BASE}/feedback/form/${splCode}`
+    : `${API_BASE}/feedback/form`;
 
   const response = await fetch(endpoint);
   const data = await response.json();
@@ -68,7 +68,7 @@ async function submitFeedback(data: {
   therapistName: string;
   responses: Record<string, string | number>;
 }): Promise<{ success: boolean; submissionId: string; message: string }> {
-  const response = await fetch(`${API_BASE}/api/feedback/submit`, {
+  const response = await fetch(`${API_BASE}/feedback/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
