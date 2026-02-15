@@ -378,25 +378,21 @@ export default function FeedbackFormPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">{formConfig.welcomeTitle}</h1>
-          <p className="text-gray-600 mb-6">{formConfig.welcomeMessage}</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Therapy Session Feedback</h1>
+          {prefilled && (
+            <p className="text-lg text-gray-600 mb-6">Session with {prefilled.therapistName}</p>
+          )}
+
+          <div className="text-gray-600 mb-6">
+            {prefilled?.userName && (
+              <p className="mb-2">Hi {prefilled.userName}</p>
+            )}
+            <p>We hope your session was useful. Would you kindly complete this short feedback form? It will take between 5-10 minutes.</p>
+          </div>
 
           {warning && (
             <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">{warning}</p>
-            </div>
-          )}
-
-          {prefilled && (
-            <div className="mb-6 p-4 bg-primary-50 border border-primary-200 rounded-lg">
-              <p className="text-sm text-primary-800">
-                <span className="font-medium">Session with:</span> {prefilled.therapistName}
-              </p>
-              {prefilled.userName && (
-                <p className="text-sm text-primary-800 mt-1">
-                  <span className="font-medium">Welcome back,</span> {prefilled.userName}
-                </p>
-              )}
             </div>
           )}
 
