@@ -104,8 +104,8 @@ function CategorySection({ label, items, categoryType, isExpanded, onToggle }: C
   const hasMore = hiddenCount > 0;
 
   return (
-    <div className="mb-3">
-      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+    <div className="mb-4">
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-2">
         {label}
       </span>
       <div className="flex flex-wrap gap-1.5 items-start content-start">
