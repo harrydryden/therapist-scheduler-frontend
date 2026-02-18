@@ -1,47 +1,28 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { submitAppointmentRequest, ApiError } from '../api/client';
-import type { TherapistDetail, AppointmentRequest } from '../types';
+import { ApiError } from '../api/client';
+import type { TherapistDetail } from '../types';
 import { APP } from '../config/constants';
+import { useBookingForm } from '../hooks/useBookingForm';
 
 // Helper to check if error is the thread limit error
 function isThreadLimitError(error: unknown): error is ApiError {
   return error instanceof ApiError && error.code === 'USER_THREAD_LIMIT';
 }
 
-// TODO FIX #38: The booking form logic (firstName, email, mutation, handleSubmit) is
-// duplicated with the inline form in TherapistCard.tsx. Extract a shared useBookingForm
-// hook or shared component to eliminate duplication.
+// FIX #38: Booking form logic (firstName, email, mutation, handleSubmit) is now
+// shared via the useBookingForm hook, eliminating duplication with TherapistCard.tsx.
 interface BookingFormProps {
   therapist: TherapistDetail;
 }
 
 export default function BookingForm({ therapist }: BookingFormProps) {
-  const [firstName, setFirstName] = useState('');
-  const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  const mutation = useMutation({
-    mutationFn: (request: AppointmentRequest) => submitAppointmentRequest(request),
-    onSuccess: () => {
-      setSubmitted(true);
-    },
+  const { firstName, setFirstName, email, setEmail, mutation, handleSubmit, canSubmit } = useBookingForm({
+    therapistNotionId: therapist.id,
+    therapistName: therapist.name,
+    onSuccess: () => setSubmitted(true),
   });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!firstName.trim() || !email.trim()) return;
-
-    mutation.mutate({
-      userName: firstName.trim(),
-      userEmail: email,
-      therapistNotionId: therapist.id,
-      // therapistEmail and therapistName are looked up on the backend from Notion
-      // This prevents the frontend from sending fake data
-      therapistName: therapist.name, // Still send for backward compat, but backend ignores
-    });
-  };
 
   // Show "therapist booked" message when not accepting bookings
   if (therapist.acceptingBookings === false) {
@@ -130,7 +111,7 @@ export default function BookingForm({ therapist }: BookingFormProps) {
                 You currently have {mutation.error.details?.activeCount || 2} active appointment requests with:
               </p>
               <ul className="text-sm text-amber-700 mt-2 list-disc list-inside">
-                {mutation.error.details?.activeTherapists?.map((name, idx) => (
+                {mutation.error.details?.activeTherapists?.map((name: string, idx: number) => (
                   <li key={idx}>{name}</li>
                 ))}
               </ul>
@@ -154,7 +135,7 @@ export default function BookingForm({ therapist }: BookingFormProps) {
 
       <button
         type="submit"
-        disabled={mutation.isPending || !firstName.trim() || !email.trim()}
+        disabled={!canSubmit}
         className="w-full px-4 py-3 text-white font-medium bg-primary-600 rounded-md hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
       >
         {mutation.isPending ? 'Submitting...' : 'Request Appointment'}

@@ -1,7 +1,5 @@
 import { useState, memo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useMutation } from '@tanstack/react-query';
-import { submitAppointmentRequest } from '../api/client';
 import type { Therapist, TherapistAvailability } from '../types';
 import {
   getExplainer,
@@ -9,6 +7,7 @@ import {
   CATEGORY_COLORS,
 } from '../config/therapist-categories';
 import { UI } from '../config/constants';
+import { useBookingForm } from '../hooks/useBookingForm';
 
 interface TherapistCardProps {
   therapist: Therapist;
@@ -259,13 +258,14 @@ function AvailabilityDisplay({ availability, isExpanded, onToggle }: Availabilit
   );
 }
 
+// FIX #38: Booking form logic (firstName, email, mutation, handleSubmit) is now
+// shared via the useBookingForm hook, eliminating duplication with BookingForm.tsx.
 const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardProps) {
-  const [firstName, setFirstName] = useState('');
-  const [email, setEmail] = useState('');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
-  const mutation = useMutation({
-    mutationFn: submitAppointmentRequest,
+  const { firstName, setFirstName, email, setEmail, mutation, handleSubmit, canSubmit } = useBookingForm({
+    therapistNotionId: therapist.id,
+    therapistName: therapist.name,
   });
 
   const toggleSection = (section: string) => {
@@ -281,18 +281,6 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
   };
 
   const isExpanded = (section: string) => expandedSections.has(section);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!firstName.trim() || !email.trim()) return;
-
-    mutation.mutate({
-      userName: firstName.trim(),
-      userEmail: email,
-      therapistNotionId: therapist.id,
-      therapistName: therapist.name,
-    });
-  };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200 flex flex-col">
@@ -365,8 +353,6 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
       </div>
 
       {/* Booking Form - always at bottom */}
-      {/* TODO FIX #38: The booking form logic below (firstName, email, mutation, handleSubmit) is
-          duplicated with BookingForm.tsx. Extract a shared useBookingForm hook or shared component. */}
       <div className="border-t border-slate-100 p-6 bg-slate-50 mt-auto">
         {mutation.isSuccess ? (
           <div className="text-center py-2">
@@ -414,7 +400,7 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
             </div>
             <button
               type="submit"
-              disabled={mutation.isPending || !firstName.trim() || !email.trim()}
+              disabled={!canSubmit}
               className="w-full py-3 px-4 text-sm font-semibold text-white bg-spill-teal-600 rounded-full hover:bg-spill-teal-400 focus:ring-2 focus:ring-spill-teal-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {mutation.isPending ? (
