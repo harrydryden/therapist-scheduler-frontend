@@ -52,12 +52,13 @@ const categoryInfo: Record<SettingCategory, { label: string; description: string
   },
 };
 
-// Get a persistent admin ID for this browser session
+// FIX S-1: Use sessionStorage instead of localStorage so admin ID
+// doesn't persist across browser sessions (reduces fingerprinting surface)
 function getAdminId(): string {
-  const stored = localStorage.getItem('admin_id');
+  const stored = sessionStorage.getItem('admin_id');
   if (stored) return stored;
   const newId = `admin_${Date.now().toString(36)}`;
-  localStorage.setItem('admin_id', newId);
+  sessionStorage.setItem('admin_id', newId);
   return newId;
 }
 

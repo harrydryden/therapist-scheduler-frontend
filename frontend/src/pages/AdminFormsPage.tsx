@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 // FIX #32: Use shared fetchAdminApi from client instead of local reimplementation
 import { fetchAdminApi } from '../api/client';
@@ -266,6 +266,8 @@ export default function AdminFormsPage() {
   // Form config state
   const [editedConfig, setEditedConfig] = useState<Partial<AdminFormConfig> | null>(null);
   const [page, setPage] = useState(1);
+  // FIX B-2: Track whether form has been initialized from server data
+  const hasInitializedRef = useRef(false);
 
   // Fetch form config
   const {
@@ -302,13 +304,17 @@ export default function AdminFormsPage() {
     mutationFn: updateFormConfig,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feedbackFormConfig'] });
+      // FIX B-2: Reset init ref so effect re-populates from refetched server data
+      hasInitializedRef.current = false;
       setEditedConfig(null);
     },
   });
 
-  // Initialize edited config when form config loads
+  // FIX B-2: Initialize edited config when form config first loads.
+  // Only auto-init once; after successful save the ref is reset so we re-populate from server.
   useEffect(() => {
-    if (formConfig && !editedConfig) {
+    if (formConfig && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
       setEditedConfig({
         formName: formConfig.formName,
         description: formConfig.description,
@@ -321,7 +327,7 @@ export default function AdminFormsPage() {
         requiresAuth: formConfig.requiresAuth,
       });
     }
-  }, [formConfig, editedConfig]);
+  }, [formConfig]);
 
   const handleSave = () => {
     if (editedConfig) {
@@ -329,9 +335,8 @@ export default function AdminFormsPage() {
     }
   };
 
+  // FIX B-2: Use functional updater pattern to avoid stale closure issues
   const handleAddQuestion = (type: 'text' | 'scale' | 'choice') => {
-    if (!editedConfig) return;
-
     const newQuestion: FormQuestion = {
       id: `question_${Date.now()}`,
       type,
@@ -341,24 +346,28 @@ export default function AdminFormsPage() {
       ...(type === 'choice' && { options: ['Yes', 'No'] }),
     };
 
-    setEditedConfig({
-      ...editedConfig,
-      questions: [...(editedConfig.questions || []), newQuestion],
-    });
+    setEditedConfig(prev => prev ? {
+      ...prev,
+      questions: [...(prev.questions || []), newQuestion],
+    } : prev);
   };
 
   const handleUpdateQuestion = (index: number, updated: FormQuestion) => {
-    if (!editedConfig) return;
-    const questions = [...(editedConfig.questions || [])];
-    questions[index] = updated;
-    setEditedConfig({ ...editedConfig, questions });
+    setEditedConfig(prev => {
+      if (!prev) return prev;
+      const questions = [...(prev.questions || [])];
+      questions[index] = updated;
+      return { ...prev, questions };
+    });
   };
 
   const handleDeleteQuestion = (index: number) => {
-    if (!editedConfig) return;
-    const questions = [...(editedConfig.questions || [])];
-    questions.splice(index, 1);
-    setEditedConfig({ ...editedConfig, questions });
+    setEditedConfig(prev => {
+      if (!prev) return prev;
+      const questions = [...(prev.questions || [])];
+      questions.splice(index, 1);
+      return { ...prev, questions };
+    });
   };
 
   return (
@@ -442,7 +451,7 @@ export default function AdminFormsPage() {
                       <input
                         type="text"
                         value={editedConfig.formName || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, formName: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, formName: v } : prev); }}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
                     </div>
@@ -451,7 +460,7 @@ export default function AdminFormsPage() {
                       <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                       <textarea
                         value={editedConfig.description || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, description: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, description: v } : prev); }}
                         rows={2}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
@@ -462,7 +471,7 @@ export default function AdminFormsPage() {
                         <input
                           type="checkbox"
                           checked={editedConfig.isActive || false}
-                          onChange={(e) => setEditedConfig({ ...editedConfig, isActive: e.target.checked })}
+                          onChange={(e) => { const v = e.target.checked; setEditedConfig(prev => prev ? { ...prev, isActive: v } : prev); }}
                           className="rounded border-slate-300"
                         />
                         <span className="text-sm text-slate-700">Form Active</span>
@@ -472,7 +481,7 @@ export default function AdminFormsPage() {
                         <input
                           type="checkbox"
                           checked={editedConfig.requiresAuth || false}
-                          onChange={(e) => setEditedConfig({ ...editedConfig, requiresAuth: e.target.checked })}
+                          onChange={(e) => { const v = e.target.checked; setEditedConfig(prev => prev ? { ...prev, requiresAuth: v } : prev); }}
                           className="rounded border-slate-300"
                         />
                         <span className="text-sm text-slate-700">Requires SPL Code</span>
@@ -491,7 +500,7 @@ export default function AdminFormsPage() {
                       <input
                         type="text"
                         value={editedConfig.welcomeTitle || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, welcomeTitle: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, welcomeTitle: v } : prev); }}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
                     </div>
@@ -500,7 +509,7 @@ export default function AdminFormsPage() {
                       <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
                       <textarea
                         value={editedConfig.welcomeMessage || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, welcomeMessage: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, welcomeMessage: v } : prev); }}
                         rows={3}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
@@ -518,7 +527,7 @@ export default function AdminFormsPage() {
                       <input
                         type="text"
                         value={editedConfig.thankYouTitle || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, thankYouTitle: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, thankYouTitle: v } : prev); }}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
                     </div>
@@ -527,7 +536,7 @@ export default function AdminFormsPage() {
                       <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
                       <textarea
                         value={editedConfig.thankYouMessage || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, thankYouMessage: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, thankYouMessage: v } : prev); }}
                         rows={3}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />

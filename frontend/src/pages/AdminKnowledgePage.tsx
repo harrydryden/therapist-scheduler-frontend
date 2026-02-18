@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getKnowledgeEntries,
@@ -20,6 +20,8 @@ export default function AdminKnowledgePage() {
   const [editingEntry, setEditingEntry] = useState<KnowledgeEntry | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
+  // FIX B-3: Track scrollToForm timeout for cleanup on unmount
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -71,9 +73,17 @@ export default function AdminKnowledgePage() {
     setIsCreating(false);
   };
 
+  // FIX B-3: Clear scroll timeout on unmount to prevent state update on unmounted component
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, []);
+
   const scrollToForm = () => {
     // Use setTimeout to ensure React has rendered the form before scrolling
-    setTimeout(() => {
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
       if (formRef.current) {
         formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else {

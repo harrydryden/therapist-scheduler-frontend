@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import DOMPurify from 'dompurify';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
   getAppointments,
   getAppointmentDetail,
@@ -977,6 +978,14 @@ export default function AdminDashboardPage() {
                 <p className="text-sm text-slate-500 mt-2">Loading...</p>
               </div>
             ) : appointmentDetail ? (
+              <ErrorBoundary fallback={
+                <div className="p-8 text-center text-red-500">
+                  <p className="font-medium mb-2">Failed to render appointment details</p>
+                  <button onClick={() => setSelectedAppointment(null)} className="text-sm text-spill-blue-800 hover:underline">
+                    Go back to list
+                  </button>
+                </div>
+              }>
               <div className="h-full flex flex-col">
                 {/* Detail Header */}
                 <div className="p-4 border-b border-slate-100">
@@ -1440,6 +1449,7 @@ export default function AdminDashboardPage() {
                   )}
                 </div>
               </div>
+              </ErrorBoundary>
             ) : null}
           </div>
         </div>
