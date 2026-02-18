@@ -114,6 +114,7 @@ function QuestionEditor({
           {question.type === 'text' && 'Text Input'}
           {question.type === 'scale' && 'Rating Scale'}
           {question.type === 'choice' && 'Multiple Choice'}
+          {question.type === 'choice_with_text' && 'Choice + Free Text'}
         </span>
         <button
           onClick={onDelete}
@@ -215,21 +216,35 @@ function QuestionEditor({
           </div>
         )}
 
-        {question.type === 'choice' && (
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Options (one per line)</label>
-            <textarea
-              value={(question.options || []).join('\n')}
-              onChange={(e) =>
-                onChange({
-                  ...question,
-                  options: e.target.value.split('\n').filter((o) => o.trim()),
-                })
-              }
-              rows={3}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-              placeholder="Option 1&#10;Option 2&#10;Option 3"
-            />
+        {(question.type === 'choice' || question.type === 'choice_with_text') && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Options (one per line)</label>
+              <textarea
+                value={(question.options || []).join('\n')}
+                onChange={(e) =>
+                  onChange({
+                    ...question,
+                    options: e.target.value.split('\n').filter((o) => o.trim()),
+                  })
+                }
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                placeholder="Option 1&#10;Option 2&#10;Option 3"
+              />
+            </div>
+            {question.type === 'choice_with_text' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Follow-up placeholder</label>
+                <input
+                  type="text"
+                  value={question.followUpPlaceholder || ''}
+                  onChange={(e) => onChange({ ...question, followUpPlaceholder: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                  placeholder="Tell us more (optional)..."
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -336,7 +351,7 @@ export default function AdminFormsPage() {
   };
 
   // FIX B-2: Use functional updater pattern to avoid stale closure issues
-  const handleAddQuestion = (type: 'text' | 'scale' | 'choice') => {
+  const handleAddQuestion = (type: 'text' | 'scale' | 'choice' | 'choice_with_text') => {
     const newQuestion: FormQuestion = {
       id: `question_${Date.now()}`,
       type,
@@ -344,6 +359,7 @@ export default function AdminFormsPage() {
       required: true,
       ...(type === 'scale' && { scaleMin: 0, scaleMax: 5, scaleMinLabel: 'Not at all', scaleMaxLabel: 'Very' }),
       ...(type === 'choice' && { options: ['Yes', 'No'] }),
+      ...(type === 'choice_with_text' && { options: ['Yes', 'No', 'Unsure'], followUpPlaceholder: 'Tell us more (optional)...' }),
     };
 
     setEditedConfig(prev => prev ? {
@@ -566,6 +582,12 @@ export default function AdminFormsPage() {
                         className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
                       >
                         + Choice
+                      </button>
+                      <button
+                        onClick={() => handleAddQuestion('choice_with_text')}
+                        className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+                      >
+                        + Choice + Text
                       </button>
                     </div>
                   </div>
