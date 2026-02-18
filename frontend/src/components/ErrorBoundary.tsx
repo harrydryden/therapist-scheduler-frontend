@@ -1,4 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
+import { reportError } from '../utils/error-reporter';
 
 interface Props {
   children: ReactNode;
@@ -27,10 +28,9 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
 
-    // TODO: Integrate an error monitoring service (e.g. Sentry).
-    // 1. Install: npm install @sentry/react
-    // 2. Initialize Sentry in main.tsx with Sentry.init({ dsn: '...' })
-    // 3. Replace this comment with: Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } })
+    // Report to error monitoring service (Sentry when configured, console otherwise).
+    // To enable Sentry: set VITE_SENTRY_DSN and install @sentry/react.
+    reportError(error, errorInfo);
   }
 
   handleReset = (): void => {
