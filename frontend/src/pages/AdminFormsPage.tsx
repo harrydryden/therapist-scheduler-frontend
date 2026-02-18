@@ -1,35 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { API_BASE, ADMIN_SECRET } from '../config/env';
-import { HEADERS } from '../config/constants';
+// FIX #32: Use shared fetchAdminApi from client instead of local reimplementation
+import { fetchAdminApi } from '../api/client';
+import type { FormQuestion, FormConfig } from '../types/feedback';
 
 // ============================================
-// Types
+// Types (page-specific; shared types in ../types/feedback.ts)
 // ============================================
 
-interface FormQuestion {
+interface AdminFormConfig extends FormConfig {
   id: string;
-  type: 'text' | 'scale' | 'choice';
-  question: string;
-  required: boolean;
-  prefilled?: boolean;
-  scaleMin?: number;
-  scaleMax?: number;
-  scaleMinLabel?: string;
-  scaleMaxLabel?: string;
-  options?: string[];
-}
-
-interface FormConfig {
-  id: string;
-  formName: string;
-  description: string | null;
-  welcomeTitle: string;
-  welcomeMessage: string;
-  thankYouTitle: string;
-  thankYouMessage: string;
-  questions: FormQuestion[];
-  isActive: boolean;
   requiresAuth: boolean;
   createdAt: string;
   updatedAt: string;
@@ -69,37 +49,22 @@ interface FeedbackStats {
 }
 
 // ============================================
-// API Functions
+// API Functions (using shared fetchAdminApi)
 // ============================================
 
-async function fetchAdminApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      [HEADERS.WEBHOOK_SECRET]: ADMIN_SECRET,
-      ...options?.headers,
-    },
-    ...options,
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || 'An error occurred');
-  }
-
-  return data;
+async function getFormConfig(): Promise<AdminFormConfig> {
+  const response = await fetchAdminApi<AdminFormConfig>('/admin/forms/feedback');
+  if (!response.data) throw new Error('Failed to load form configuration');
+  return response.data;
 }
 
-async function getFormConfig(): Promise<FormConfig> {
-  return fetchAdminApi<FormConfig>('/admin/forms/feedback');
-}
-
-async function updateFormConfig(updates: Partial<FormConfig>): Promise<FormConfig> {
-  return fetchAdminApi<FormConfig>('/admin/forms/feedback', {
+async function updateFormConfig(updates: Partial<AdminFormConfig>): Promise<AdminFormConfig> {
+  const response = await fetchAdminApi<AdminFormConfig>('/admin/forms/feedback', {
     method: 'PUT',
     body: JSON.stringify(updates),
   });
+  if (!response.data) throw new Error('Failed to save form configuration');
+  return response.data;
 }
 
 async function getSubmissions(params?: {
@@ -115,11 +80,18 @@ async function getSubmissions(params?: {
   if (params?.limit) queryParams.set('limit', String(params.limit));
   if (params?.therapist) queryParams.set('therapist', params.therapist);
 
-  return fetchAdminApi(`/admin/forms/feedback/submissions?${queryParams.toString()}`);
+  const response = await fetchAdminApi<{
+    submissions: FeedbackSubmission[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>(`/admin/forms/feedback/submissions?${queryParams.toString()}`);
+  if (!response.data) throw new Error('Failed to load submissions');
+  return response.data;
 }
 
 async function getStats(): Promise<FeedbackStats> {
-  return fetchAdminApi<FeedbackStats>('/admin/forms/feedback/stats');
+  const response = await fetchAdminApi<FeedbackStats>('/admin/forms/feedback/stats');
+  if (!response.data) throw new Error('Failed to load statistics');
+  return response.data;
 }
 
 // ============================================
@@ -142,6 +114,7 @@ function QuestionEditor({
           {question.type === 'text' && 'Text Input'}
           {question.type === 'scale' && 'Rating Scale'}
           {question.type === 'choice' && 'Multiple Choice'}
+          {question.type === 'choice_with_text' && 'Choice + Free Text'}
         </span>
         <button
           onClick={onDelete}
@@ -153,9 +126,10 @@ function QuestionEditor({
 
       <div className="space-y-3">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Question ID</label>
+          <label htmlFor={`q-${question.id}-id`} className="block text-sm font-medium text-slate-700 mb-1">Question ID</label>
           <input
             type="text"
+            id={`q-${question.id}-id`}
             value={question.id}
             onChange={(e) => onChange({ ...question, id: e.target.value })}
             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
@@ -164,9 +138,10 @@ function QuestionEditor({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Question Text</label>
+          <label htmlFor={`q-${question.id}-text`} className="block text-sm font-medium text-slate-700 mb-1">Question Text</label>
           <input
             type="text"
+            id={`q-${question.id}-text`}
             value={question.question}
             onChange={(e) => onChange({ ...question, question: e.target.value })}
             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
@@ -241,21 +216,35 @@ function QuestionEditor({
           </div>
         )}
 
-        {question.type === 'choice' && (
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Options (one per line)</label>
-            <textarea
-              value={(question.options || []).join('\n')}
-              onChange={(e) =>
-                onChange({
-                  ...question,
-                  options: e.target.value.split('\n').filter((o) => o.trim()),
-                })
-              }
-              rows={3}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-              placeholder="Option 1&#10;Option 2&#10;Option 3"
-            />
+        {(question.type === 'choice' || question.type === 'choice_with_text') && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Options (one per line)</label>
+              <textarea
+                value={(question.options || []).join('\n')}
+                onChange={(e) =>
+                  onChange({
+                    ...question,
+                    options: e.target.value.split('\n').filter((o) => o.trim()),
+                  })
+                }
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                placeholder="Option 1&#10;Option 2&#10;Option 3"
+              />
+            </div>
+            {question.type === 'choice_with_text' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Follow-up placeholder</label>
+                <input
+                  type="text"
+                  value={question.followUpPlaceholder || ''}
+                  onChange={(e) => onChange({ ...question, followUpPlaceholder: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                  placeholder="Tell us more (optional)..."
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -290,8 +279,10 @@ export default function AdminFormsPage() {
   const [activeTab, setActiveTab] = useState<'config' | 'submissions' | 'stats'>('config');
 
   // Form config state
-  const [editedConfig, setEditedConfig] = useState<Partial<FormConfig> | null>(null);
+  const [editedConfig, setEditedConfig] = useState<Partial<AdminFormConfig> | null>(null);
   const [page, setPage] = useState(1);
+  // FIX B-2: Track whether form has been initialized from server data
+  const hasInitializedRef = useRef(false);
 
   // Fetch form config
   const {
@@ -328,13 +319,17 @@ export default function AdminFormsPage() {
     mutationFn: updateFormConfig,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feedbackFormConfig'] });
+      // FIX B-2: Reset init ref so effect re-populates from refetched server data
+      hasInitializedRef.current = false;
       setEditedConfig(null);
     },
   });
 
-  // Initialize edited config when form config loads
+  // FIX B-2: Initialize edited config when form config first loads.
+  // Only auto-init once; after successful save the ref is reset so we re-populate from server.
   useEffect(() => {
-    if (formConfig && !editedConfig) {
+    if (formConfig && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
       setEditedConfig({
         formName: formConfig.formName,
         description: formConfig.description,
@@ -347,7 +342,7 @@ export default function AdminFormsPage() {
         requiresAuth: formConfig.requiresAuth,
       });
     }
-  }, [formConfig, editedConfig]);
+  }, [formConfig]);
 
   const handleSave = () => {
     if (editedConfig) {
@@ -355,9 +350,8 @@ export default function AdminFormsPage() {
     }
   };
 
-  const handleAddQuestion = (type: 'text' | 'scale' | 'choice') => {
-    if (!editedConfig) return;
-
+  // FIX B-2: Use functional updater pattern to avoid stale closure issues
+  const handleAddQuestion = (type: 'text' | 'scale' | 'choice' | 'choice_with_text') => {
     const newQuestion: FormQuestion = {
       id: `question_${Date.now()}`,
       type,
@@ -365,26 +359,31 @@ export default function AdminFormsPage() {
       required: true,
       ...(type === 'scale' && { scaleMin: 0, scaleMax: 5, scaleMinLabel: 'Not at all', scaleMaxLabel: 'Very' }),
       ...(type === 'choice' && { options: ['Yes', 'No'] }),
+      ...(type === 'choice_with_text' && { options: ['Yes', 'No', 'Unsure'], followUpPlaceholder: 'Tell us more (optional)...' }),
     };
 
-    setEditedConfig({
-      ...editedConfig,
-      questions: [...(editedConfig.questions || []), newQuestion],
-    });
+    setEditedConfig(prev => prev ? {
+      ...prev,
+      questions: [...(prev.questions || []), newQuestion],
+    } : prev);
   };
 
   const handleUpdateQuestion = (index: number, updated: FormQuestion) => {
-    if (!editedConfig) return;
-    const questions = [...(editedConfig.questions || [])];
-    questions[index] = updated;
-    setEditedConfig({ ...editedConfig, questions });
+    setEditedConfig(prev => {
+      if (!prev) return prev;
+      const questions = [...(prev.questions || [])];
+      questions[index] = updated;
+      return { ...prev, questions };
+    });
   };
 
   const handleDeleteQuestion = (index: number) => {
-    if (!editedConfig) return;
-    const questions = [...(editedConfig.questions || [])];
-    questions.splice(index, 1);
-    setEditedConfig({ ...editedConfig, questions });
+    setEditedConfig(prev => {
+      if (!prev) return prev;
+      const questions = [...(prev.questions || [])];
+      questions.splice(index, 1);
+      return { ...prev, questions };
+    });
   };
 
   return (
@@ -406,8 +405,11 @@ export default function AdminFormsPage() {
         )}
 
         {/* Tabs */}
-        <div className="mb-6 flex gap-2 border-b border-slate-200">
+        <div role="tablist" aria-label="Forms management" className="mb-6 flex gap-2 border-b border-slate-200">
           <button
+            role="tab"
+            aria-selected={activeTab === 'config'}
+            aria-controls="tab-panel-config"
             onClick={() => setActiveTab('config')}
             className={`px-4 py-2 font-medium text-sm transition-colors ${
               activeTab === 'config'
@@ -418,6 +420,9 @@ export default function AdminFormsPage() {
             Form Configuration
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'submissions'}
+            aria-controls="tab-panel-submissions"
             onClick={() => setActiveTab('submissions')}
             className={`px-4 py-2 font-medium text-sm transition-colors ${
               activeTab === 'submissions'
@@ -428,6 +433,9 @@ export default function AdminFormsPage() {
             Submissions
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'stats'}
+            aria-controls="tab-panel-stats"
             onClick={() => setActiveTab('stats')}
             className={`px-4 py-2 font-medium text-sm transition-colors ${
               activeTab === 'stats'
@@ -441,7 +449,7 @@ export default function AdminFormsPage() {
 
         {/* Form Configuration Tab */}
         {activeTab === 'config' && (
-          <div className="space-y-6">
+          <div id="tab-panel-config" role="tabpanel" className="space-y-6">
             {configLoading ? (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-spill-grey-200 border-t-spill-blue-800 mx-auto"></div>
@@ -459,7 +467,7 @@ export default function AdminFormsPage() {
                       <input
                         type="text"
                         value={editedConfig.formName || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, formName: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, formName: v } : prev); }}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
                     </div>
@@ -468,7 +476,7 @@ export default function AdminFormsPage() {
                       <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                       <textarea
                         value={editedConfig.description || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, description: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, description: v } : prev); }}
                         rows={2}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
@@ -479,7 +487,7 @@ export default function AdminFormsPage() {
                         <input
                           type="checkbox"
                           checked={editedConfig.isActive || false}
-                          onChange={(e) => setEditedConfig({ ...editedConfig, isActive: e.target.checked })}
+                          onChange={(e) => { const v = e.target.checked; setEditedConfig(prev => prev ? { ...prev, isActive: v } : prev); }}
                           className="rounded border-slate-300"
                         />
                         <span className="text-sm text-slate-700">Form Active</span>
@@ -489,7 +497,7 @@ export default function AdminFormsPage() {
                         <input
                           type="checkbox"
                           checked={editedConfig.requiresAuth || false}
-                          onChange={(e) => setEditedConfig({ ...editedConfig, requiresAuth: e.target.checked })}
+                          onChange={(e) => { const v = e.target.checked; setEditedConfig(prev => prev ? { ...prev, requiresAuth: v } : prev); }}
                           className="rounded border-slate-300"
                         />
                         <span className="text-sm text-slate-700">Requires SPL Code</span>
@@ -508,7 +516,7 @@ export default function AdminFormsPage() {
                       <input
                         type="text"
                         value={editedConfig.welcomeTitle || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, welcomeTitle: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, welcomeTitle: v } : prev); }}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
                     </div>
@@ -517,7 +525,7 @@ export default function AdminFormsPage() {
                       <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
                       <textarea
                         value={editedConfig.welcomeMessage || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, welcomeMessage: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, welcomeMessage: v } : prev); }}
                         rows={3}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
@@ -535,7 +543,7 @@ export default function AdminFormsPage() {
                       <input
                         type="text"
                         value={editedConfig.thankYouTitle || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, thankYouTitle: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, thankYouTitle: v } : prev); }}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
                     </div>
@@ -544,7 +552,7 @@ export default function AdminFormsPage() {
                       <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
                       <textarea
                         value={editedConfig.thankYouMessage || ''}
-                        onChange={(e) => setEditedConfig({ ...editedConfig, thankYouMessage: e.target.value })}
+                        onChange={(e) => { const v = e.target.value; setEditedConfig(prev => prev ? { ...prev, thankYouMessage: v } : prev); }}
                         rows={3}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                       />
@@ -574,6 +582,12 @@ export default function AdminFormsPage() {
                         className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
                       >
                         + Choice
+                      </button>
+                      <button
+                        onClick={() => handleAddQuestion('choice_with_text')}
+                        className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+                      >
+                        + Choice + Text
                       </button>
                     </div>
                   </div>
@@ -635,7 +649,7 @@ export default function AdminFormsPage() {
 
         {/* Submissions Tab */}
         {activeTab === 'submissions' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div id="tab-panel-submissions" role="tabpanel" className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             {submissionsLoading ? (
               <div className="p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-spill-grey-200 border-t-spill-blue-800 mx-auto"></div>
@@ -728,7 +742,7 @@ export default function AdminFormsPage() {
 
         {/* Statistics Tab */}
         {activeTab === 'stats' && (
-          <div className="space-y-6">
+          <div id="tab-panel-stats" role="tabpanel" className="space-y-6">
             {statsLoading ? (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-spill-grey-200 border-t-spill-blue-800 mx-auto"></div>

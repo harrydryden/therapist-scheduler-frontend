@@ -22,7 +22,7 @@ import type {
   UpdateSettingRequest,
   BulkUpdateSettingsRequest,
 } from '../types';
-import { API_BASE, ADMIN_SECRET } from '../config/env';
+import { API_BASE, getAdminSecret } from '../config/env';
 import { HEADERS, TIMEOUTS } from '../config/constants';
 
 // Custom error class to carry API error details
@@ -119,7 +119,7 @@ async function fetchWithRetry(
 /**
  * Safely parse JSON response, handling non-JSON error pages
  */
-async function safeParseJson(response: Response): Promise<any> {
+async function safeParseJson(response: Response): Promise<unknown> {
   const text = await response.text();
   try {
     return JSON.parse(text);
@@ -136,7 +136,7 @@ async function safeParseJson(response: Response): Promise<any> {
  * FIX M3: Request deduplication to prevent concurrent duplicate requests
  * Stores pending promises by request key to coalesce identical concurrent requests
  */
-const pendingRequests = new Map<string, Promise<any>>();
+const pendingRequests = new Map<string, Promise<unknown>>();
 
 function getRequestKey(method: string, endpoint: string): string {
   // For GET requests, use method:endpoint to deduplicate
@@ -252,7 +252,7 @@ export async function previewTherapistCV(file: File | null, additionalInfo: stri
       method: 'POST',
       body: formData,
       headers: {
-        [HEADERS.WEBHOOK_SECRET]: ADMIN_SECRET,
+        [HEADERS.WEBHOOK_SECRET]: getAdminSecret(),
       },
     },
     TIMEOUTS.LONG_MS
@@ -302,7 +302,7 @@ export async function createTherapistFromCV(file: File | null, adminNotes: Admin
       method: 'POST',
       body: formData,
       headers: {
-        [HEADERS.WEBHOOK_SECRET]: ADMIN_SECRET,
+        [HEADERS.WEBHOOK_SECRET]: getAdminSecret(),
       },
     },
     TIMEOUTS.LONG_MS
@@ -319,25 +319,29 @@ export async function createTherapistFromCV(file: File | null, adminNotes: Admin
 
 // Admin Dashboard API functions
 //
-// SECURITY NOTE: This webhook secret is exposed in the frontend build.
+// FIX #3: Admin secret is now read from sessionStorage at runtime via getAdminSecret(),
+// instead of being baked into the production JS bundle from VITE_ADMIN_SECRET.
+// The AdminLayout prompts the admin to enter the secret on first visit.
 // TODO: Implement proper session-based authentication for admin routes:
 // 1. Add /admin/login endpoint with password/OAuth
 // 2. Use httpOnly cookies for session tokens
 // 3. Remove x-webhook-secret header from frontend
-// For now, this provides basic protection for internal tools.
 
-async function fetchAdminApi<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T> & { pagination?: PaginationInfo; total?: number }> {
+export async function fetchAdminApi<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T> & { pagination?: PaginationInfo; total?: number }> {
   // FIX M3: Use request deduplication for GET requests
   return fetchWithDedup<ApiResponse<T> & { pagination?: PaginationInfo; total?: number }>(
     endpoint,
     options,
     async () => {
-      const response = await fetchWithTimeout(
+      const method = options?.method || 'GET';
+      // Use retry logic for GET requests (safe to retry), direct fetch for mutations
+      const fetchFn = method === 'GET' ? fetchWithRetry : fetchWithTimeout;
+      const response = await fetchFn(
         `${API_BASE}${endpoint}`,
         {
           headers: {
             'Content-Type': 'application/json',
-            [HEADERS.WEBHOOK_SECRET]: ADMIN_SECRET,
+            [HEADERS.WEBHOOK_SECRET]: getAdminSecret(),
             ...options?.headers,
           },
           ...options,
@@ -345,10 +349,10 @@ async function fetchAdminApi<T>(endpoint: string, options?: RequestInit): Promis
         TIMEOUTS.DEFAULT_MS
       );
 
-      const data = await safeParseJson(response);
+      const data = await safeParseJson(response) as Record<string, unknown>;
 
       if (!response.ok) {
-        throw new Error(data.error || 'An error occurred');
+        throw new Error((data.error as string) || 'An error occurred');
       }
 
       return data;

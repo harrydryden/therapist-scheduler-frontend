@@ -1,7 +1,5 @@
 import { useState, memo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useMutation } from '@tanstack/react-query';
-import { submitAppointmentRequest } from '../api/client';
 import type { Therapist, TherapistAvailability } from '../types';
 import {
   getExplainer,
@@ -9,6 +7,7 @@ import {
   CATEGORY_COLORS,
 } from '../config/therapist-categories';
 import { UI } from '../config/constants';
+import { useBookingForm } from '../hooks/useBookingForm';
 
 interface TherapistCardProps {
   therapist: Therapist;
@@ -22,7 +21,7 @@ interface CategoryBadgeProps {
 
 function CategoryBadge({ type, categoryType }: CategoryBadgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(null);
   const badgeRef = useRef<HTMLSpanElement>(null);
   const explainer = getExplainer(categoryType, type);
   const colorClass = CATEGORY_COLORS[categoryType];
@@ -34,8 +33,17 @@ function CategoryBadge({ type, categoryType }: CategoryBadgeProps) {
         top: rect.top - 8, // Position above the badge with small gap
         left: rect.left + rect.width / 2, // Center horizontally
       });
+    } else if (!showTooltip) {
+      setTooltipPosition(null);
     }
   }, [showTooltip]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setShowTooltip((prev) => !prev);
+    }
+  };
 
   return (
     <div className="relative inline-block">
@@ -46,6 +54,7 @@ function CategoryBadge({ type, categoryType }: CategoryBadgeProps) {
         onMouseLeave={() => setShowTooltip(false)}
         onFocus={() => setShowTooltip(true)}
         onBlur={() => setShowTooltip(false)}
+        onKeyDown={handleKeyDown}
         tabIndex={0}
         role="button"
         aria-describedby={explainer ? `tooltip-${type.replace(/\s/g, '-')}` : undefined}
@@ -59,9 +68,10 @@ function CategoryBadge({ type, categoryType }: CategoryBadgeProps) {
           className="fixed px-3 py-2 text-xs text-white bg-slate-800 rounded-lg shadow-lg max-w-xs whitespace-normal pointer-events-none"
           style={{
             zIndex: UI.Z_INDEX.TOOLTIP,
-            top: tooltipPosition.top,
-            left: tooltipPosition.left,
+            top: tooltipPosition?.top ?? 0,
+            left: tooltipPosition?.left ?? 0,
             transform: 'translate(-50%, -100%)',
+            visibility: tooltipPosition ? 'visible' : 'hidden',
           }}
         >
           {explainer}
@@ -248,13 +258,14 @@ function AvailabilityDisplay({ availability, isExpanded, onToggle }: Availabilit
   );
 }
 
+// FIX #38: Booking form logic (firstName, email, mutation, handleSubmit) is now
+// shared via the useBookingForm hook, eliminating duplication with BookingForm.tsx.
 const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardProps) {
-  const [firstName, setFirstName] = useState('');
-  const [email, setEmail] = useState('');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
-  const mutation = useMutation({
-    mutationFn: submitAppointmentRequest,
+  const { firstName, setFirstName, email, setEmail, mutation, handleSubmit, canSubmit } = useBookingForm({
+    therapistNotionId: therapist.id,
+    therapistName: therapist.name,
   });
 
   const toggleSection = (section: string) => {
@@ -270,18 +281,6 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
   };
 
   const isExpanded = (section: string) => expandedSections.has(section);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!firstName.trim() || !email.trim()) return;
-
-    mutation.mutate({
-      userName: firstName.trim(),
-      userEmail: email,
-      therapistNotionId: therapist.id,
-      therapistName: therapist.name,
-    });
-  };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200 flex flex-col">
@@ -401,7 +400,7 @@ const TherapistCard = memo(function TherapistCard({ therapist }: TherapistCardPr
             </div>
             <button
               type="submit"
-              disabled={mutation.isPending || !firstName.trim() || !email.trim()}
+              disabled={!canSubmit}
               className="w-full py-3 px-4 text-sm font-semibold text-white bg-spill-teal-600 rounded-full hover:bg-spill-teal-400 focus:ring-2 focus:ring-spill-teal-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {mutation.isPending ? (

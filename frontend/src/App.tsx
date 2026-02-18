@@ -1,16 +1,27 @@
-import { Routes, Route } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Link } from 'react-router-dom';
 import TherapistsPage from './pages/TherapistsPage';
 import TherapistDetailPage from './pages/TherapistDetailPage';
-import AdminHomePage from './pages/AdminHomePage';
-import AdminIngestionPage from './pages/AdminIngestionPage';
-import AdminDashboardPage from './pages/AdminDashboardPage';
-import AdminKnowledgePage from './pages/AdminKnowledgePage';
-import AdminSettingsPage from './pages/AdminSettingsPage';
 import FeedbackFormPage from './pages/FeedbackFormPage';
-import AdminFormsPage from './pages/AdminFormsPage';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
 import ErrorBoundary from './components/ErrorBoundary';
+
+// Lazy-load admin pages to reduce initial bundle size for public users
+const AdminHomePage = lazy(() => import('./pages/AdminHomePage'));
+const AdminIngestionPage = lazy(() => import('./pages/AdminIngestionPage'));
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
+const AdminKnowledgePage = lazy(() => import('./pages/AdminKnowledgePage'));
+const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'));
+const AdminFormsPage = lazy(() => import('./pages/AdminFormsPage'));
+
+function AdminLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center p-12">
+      <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-spill-blue-800"></div>
+    </div>
+  );
+}
 
 function App() {
   return (
@@ -37,53 +48,32 @@ function App() {
         <Route path="/feedback" element={<FeedbackFormPage />} />
         <Route path="/feedback/:splCode" element={<FeedbackFormPage />} />
 
-        {/* Admin routes with sidebar layout */}
+        {/* Admin routes with sidebar layout - lazy loaded */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Suspense fallback={<AdminLoadingFallback />}><AdminHomePage /></Suspense>} />
+          <Route path="dashboard" element={<Suspense fallback={<AdminLoadingFallback />}><AdminDashboardPage /></Suspense>} />
+          <Route path="ingestion" element={<Suspense fallback={<AdminLoadingFallback />}><AdminIngestionPage /></Suspense>} />
+          <Route path="knowledge" element={<Suspense fallback={<AdminLoadingFallback />}><AdminKnowledgePage /></Suspense>} />
+          <Route path="forms" element={<Suspense fallback={<AdminLoadingFallback />}><AdminFormsPage /></Suspense>} />
+          <Route path="settings" element={<Suspense fallback={<AdminLoadingFallback />}><AdminSettingsPage /></Suspense>} />
+        </Route>
+
+        {/* 404 catch-all route */}
         <Route
-          path="/admin"
+          path="*"
           element={
-            <AdminLayout>
-              <AdminHomePage />
-            </AdminLayout>
-          }
-        />
-        <Route
-          path="/admin/dashboard"
-          element={
-            <AdminLayout>
-              <AdminDashboardPage />
-            </AdminLayout>
-          }
-        />
-        <Route
-          path="/admin/ingestion"
-          element={
-            <AdminLayout>
-              <AdminIngestionPage />
-            </AdminLayout>
-          }
-        />
-        <Route
-          path="/admin/knowledge"
-          element={
-            <AdminLayout>
-              <AdminKnowledgePage />
-            </AdminLayout>
-          }
-        />
-        <Route
-          path="/admin/forms"
-          element={
-            <AdminLayout>
-              <AdminFormsPage />
-            </AdminLayout>
-          }
-        />
-        <Route
-          path="/admin/settings"
-          element={
-            <AdminLayout>
-              <AdminSettingsPage />
-            </AdminLayout>
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+                <h1 className="text-4xl font-bold text-gray-900 mb-2">404</h1>
+                <p className="text-gray-600 mb-6">Page not found</p>
+                <Link
+                  to="/"
+                  className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+                >
+                  Go back home
+                </Link>
+              </div>
+            </div>
           }
         />
       </Routes>

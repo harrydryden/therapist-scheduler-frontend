@@ -1,34 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { API_BASE } from '../config/env';
-
-// ============================================
-// Types
-// ============================================
-
-interface FormQuestion {
-  id: string;
-  type: 'text' | 'scale' | 'choice';
-  question: string;
-  required: boolean;
-  prefilled?: boolean;
-  scaleMin?: number;
-  scaleMax?: number;
-  scaleMinLabel?: string;
-  scaleMaxLabel?: string;
-  options?: string[];
-}
-
-interface FormConfig {
-  formName: string;
-  description: string | null;
-  welcomeTitle: string;
-  welcomeMessage: string;
-  thankYouTitle: string;
-  thankYouMessage: string;
-  questions: FormQuestion[];
-  isActive: boolean;
-}
+// FIX #39: Import shared types instead of duplicating them
+import type { FormQuestion, FormConfig } from '../types/feedback';
 
 interface PrefilledData {
   trackingCode: string;
@@ -46,14 +20,37 @@ interface FeedbackFormResponse {
 
 // ============================================
 // API Functions (public, no auth)
+// FIX #31: Added AbortController with 30-second timeout to all fetch calls
 // ============================================
 
-async function getFeedbackForm(splCode?: string): Promise<FeedbackFormResponse> {
+const FEEDBACK_TIMEOUT_MS = 30000;
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FEEDBACK_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timed out. Please try again.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function getFeedbackForm(splCode?: string, signal?: AbortSignal): Promise<FeedbackFormResponse> {
   const endpoint = splCode
     ? `${API_BASE}/feedback/form/${splCode}`
     : `${API_BASE}/feedback/form`;
 
-  const response = await fetch(endpoint);
+  const response = await fetchWithTimeout(endpoint, signal ? { signal } : {});
   const data = await response.json();
 
   if (!response.ok) {
@@ -68,7 +65,7 @@ async function submitFeedback(data: {
   therapistName: string;
   responses: Record<string, string | number>;
 }): Promise<{ success: boolean; submissionId: string; message: string }> {
-  const response = await fetch(`${API_BASE}/feedback/submit`, {
+  const response = await fetchWithTimeout(`${API_BASE}/feedback/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -112,6 +109,8 @@ function ScaleQuestion({
             key={num}
             type="button"
             onClick={() => onChange(num)}
+            aria-label={`${num} out of ${max}${num === min && question.scaleMinLabel ? ` - ${question.scaleMinLabel}` : ''}${num === max && question.scaleMaxLabel ? ` - ${question.scaleMaxLabel}` : ''}`}
+            aria-pressed={value === num}
             className={`
               flex-1 py-3 rounded-lg font-medium transition-all
               ${value === num
@@ -161,6 +160,54 @@ function ChoiceQuestion({
   );
 }
 
+function ChoiceWithTextQuestion({
+  question,
+  choiceValue,
+  textValue,
+  onChoiceChange,
+  onTextChange,
+}: {
+  question: FormQuestion;
+  choiceValue: string | null;
+  textValue: string;
+  onChoiceChange: (value: string) => void;
+  onTextChange: (value: string) => void;
+}) {
+  const options = question.options || [];
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onChoiceChange(option)}
+            className={`
+              w-full py-3 px-4 rounded-lg font-medium text-left transition-all
+              ${choiceValue === option
+                ? 'bg-primary-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }
+            `}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+      {choiceValue && (
+        <textarea
+          value={textValue}
+          onChange={(e) => onTextChange(e.target.value)}
+          placeholder={question.followUpPlaceholder || 'Tell us more (optional)...'}
+          rows={3}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+        />
+      )}
+    </div>
+  );
+}
+
 // ============================================
 // Main Page Component
 // ============================================
@@ -182,14 +229,18 @@ export default function FeedbackFormPage() {
   const [isComplete, setIsComplete] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
 
-  // Load form on mount
+  // Load form on mount with cleanup to prevent state updates after unmount
   useEffect(() => {
+    const controller = new AbortController();
+
     async function loadForm() {
       try {
         setIsLoading(true);
         setError(null);
 
-        const data = await getFeedbackForm(splCode);
+        const data = await getFeedbackForm(splCode, controller.signal);
+        if (controller.signal.aborted) return;
+
         setFormConfig(data.form);
         setPrefilled(data.prefilled);
 
@@ -205,20 +256,26 @@ export default function FeedbackFormPage() {
           }));
         }
       } catch (err) {
+        if (controller.signal.aborted) return;
         const errorMessage = err instanceof Error ? err.message : 'Failed to load form';
+        // FIX #40: Check structured error code in addition to string matching
+        const errorCode = (err as { code?: string })?.code;
 
         // Check if feedback was already submitted
-        if (errorMessage.includes('already submitted')) {
+        if (errorCode === 'ALREADY_SUBMITTED' || errorMessage.includes('already submitted')) {
           setAlreadySubmitted(true);
         } else {
           setError(errorMessage);
         }
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     }
 
     loadForm();
+    return () => controller.abort();
   }, [splCode]);
 
   // Handle response changes
@@ -274,8 +331,10 @@ export default function FeedbackFormPage() {
       setIsComplete(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to submit feedback';
+      // FIX #40: Check structured error code in addition to string matching
+      const errorCode = (err as { code?: string })?.code;
 
-      if (errorMessage.includes('already submitted')) {
+      if (errorCode === 'ALREADY_SUBMITTED' || errorMessage.includes('already submitted')) {
         setAlreadySubmitted(true);
       } else {
         setError(errorMessage);
@@ -290,6 +349,7 @@ export default function FeedbackFormPage() {
     if (currentQuestionIndex < 0 || !formConfig) return true;
     const currentQuestion = formConfig.questions[currentQuestionIndex];
     const response = responses[currentQuestion.id];
+    // For choice_with_text, the choice itself is required but the text is optional
     return response !== undefined && response !== '' && response !== null;
   };
 
@@ -419,7 +479,14 @@ export default function FeedbackFormPage() {
           <div className="flex justify-between text-sm text-gray-500 mb-2">
             <span>Question {currentQuestionIndex + 1} of {formConfig.questions.length}</span>
           </div>
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            role="progressbar"
+            aria-valuenow={Math.round(progress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Form completion progress"
+            className="h-2 bg-gray-200 rounded-full overflow-hidden"
+          >
             <div
               className="h-full bg-primary-600 transition-all duration-300"
               style={{ width: `${progress}%` }}
@@ -465,6 +532,16 @@ export default function FeedbackFormPage() {
               onChange={(value) => handleResponseChange(currentQuestion.id, value)}
             />
           )}
+
+          {currentQuestion.type === 'choice_with_text' && (
+            <ChoiceWithTextQuestion
+              question={currentQuestion}
+              choiceValue={(responses[currentQuestion.id] as string) || null}
+              textValue={(responses[`${currentQuestion.id}_text`] as string) || ''}
+              onChoiceChange={(value) => handleResponseChange(currentQuestion.id, value)}
+              onTextChange={(value) => handleResponseChange(`${currentQuestion.id}_text`, value)}
+            />
+          )}
         </div>
 
         {/* Navigation buttons */}
@@ -480,10 +557,10 @@ export default function FeedbackFormPage() {
 
           <button
             onClick={handleNext}
-            disabled={currentQuestion.required && !isCurrentQuestionAnswered() || isSubmitting}
+            disabled={(currentQuestion.required && !isCurrentQuestionAnswered()) || isSubmitting}
             className={`
               flex-1 py-3 px-6 rounded-lg font-medium transition-colors
-              ${currentQuestion.required && !isCurrentQuestionAnswered()
+              ${(currentQuestion.required && !isCurrentQuestionAnswered())
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-primary-600 text-white hover:bg-primary-700'
               }
