@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 // FIX #32: Use shared fetchAdminApi from client instead of local reimplementation
 import { fetchAdminApi } from '../api/client';
+import { API_BASE, getAdminSecret } from '../config/env';
+import { HEADERS } from '../config/constants';
 import type { FormQuestion, FormConfig } from '../types/feedback';
 
 // ============================================
@@ -25,7 +27,14 @@ interface FeedbackSubmission {
   safetyScore: number | null;
   listenedToScore: number | null;
   professionalScore: number | null;
+  understoodScore: number | null;
   wouldBookAgain: string | null;
+  wouldBookAgainText: string | null;
+  wouldRecommend: string | null;
+  wouldRecommendText: string | null;
+  sessionBenefits: string | null;
+  improvementSuggestions: string | null;
+  additionalComments: string | null;
   syncedToNotion: boolean;
   createdAt: string;
   appointment?: {
@@ -44,8 +53,10 @@ interface FeedbackStats {
     safety: string | null;
     listenedTo: string | null;
     professional: string | null;
+    understood: string | null;
   };
   wouldBookAgain: Record<string, number>;
+  wouldRecommend: Record<string, number>;
 }
 
 // ============================================
@@ -344,6 +355,24 @@ export default function AdminFormsPage() {
       });
     }
   }, [formConfig]);
+
+  const handleDownloadCsv = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/forms/feedback/submissions/export`, {
+        headers: { [HEADERS.WEBHOOK_SECRET]: getAdminSecret() },
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `feedback-submissions-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('CSV download failed:', err);
+    }
+  };
 
   const handleSave = () => {
     if (editedConfig) {
@@ -656,6 +685,22 @@ export default function AdminFormsPage() {
         {/* Submissions Tab */}
         {activeTab === 'submissions' && (
           <div id="tab-panel-submissions" role="tabpanel" className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+              <h2 className="text-sm font-medium text-slate-700">
+                {submissionsData?.pagination
+                  ? `${submissionsData.pagination.total} submissions`
+                  : 'Submissions'}
+              </h2>
+              <button
+                onClick={handleDownloadCsv}
+                className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Download CSV
+              </button>
+            </div>
             {submissionsLoading ? (
               <div className="p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-spill-grey-200 border-t-spill-blue-800 mx-auto"></div>
@@ -667,37 +712,57 @@ export default function AdminFormsPage() {
                   <table className="w-full">
                     <thead className="bg-slate-50 border-b border-slate-100">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tracking Code</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Therapist</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Safety</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Listened</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Professional</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Book Again?</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Synced</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Tracking Code</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Therapist</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Safety</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Professional</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Heard</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Understood</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Session Benefits</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Improvements</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Book Again?</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Recommend?</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Additional Comments</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Synced</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {(submissionsData?.submissions ?? []).map((submission) => (
                         <tr key={submission.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 text-sm text-slate-600">
+                          <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">
                             {new Date(submission.createdAt).toLocaleDateString()}
                           </td>
-                          <td className="px-4 py-3 text-sm font-mono text-slate-700">
+                          <td className="px-4 py-3 text-sm font-mono text-slate-700 whitespace-nowrap">
                             {submission.trackingCode || '-'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-slate-700">{submission.therapistName}</td>
+                          <td className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{submission.therapistName}</td>
                           <td className="px-4 py-3 text-center">
                             <ScoreBadge score={submission.safetyScore} />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <ScoreBadge score={submission.listenedToScore} />
                           </td>
                           <td className="px-4 py-3 text-center">
                             <ScoreBadge score={submission.professionalScore} />
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <BookAgainBadge value={submission.wouldBookAgain} />
+                            <ScoreBadge score={submission.listenedToScore} />
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <ScoreBadge score={submission.understoodScore} />
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600 max-w-[200px] truncate" title={submission.sessionBenefits || ''}>
+                            {submission.sessionBenefits || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600 max-w-[200px] truncate" title={submission.improvementSuggestions || ''}>
+                            {submission.improvementSuggestions || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <ChoiceBadge value={submission.wouldBookAgain} text={submission.wouldBookAgainText} />
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <ChoiceBadge value={submission.wouldRecommend} text={submission.wouldRecommendText} />
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600 max-w-[200px] truncate" title={submission.additionalComments || ''}>
+                            {submission.additionalComments || '-'}
                           </td>
                           <td className="px-4 py-3 text-center">
                             {submission.syncedToNotion ? (
@@ -783,18 +848,11 @@ export default function AdminFormsPage() {
                 {/* Average Scores */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
                   <h2 className="text-lg font-semibold text-slate-900 mb-4">Average Scores (Last 30 Days)</h2>
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     <div>
                       <p className="text-sm text-slate-500 mb-1">Safety & Comfort</p>
                       <p className="text-3xl font-bold text-slate-900">
                         {stats.averageScores.safety || '-'}
-                        <span className="text-lg text-slate-400 font-normal"> / 5</span>
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 mb-1">Listened To</p>
-                      <p className="text-3xl font-bold text-slate-900">
-                        {stats.averageScores.listenedTo || '-'}
                         <span className="text-lg text-slate-400 font-normal"> / 5</span>
                       </p>
                     </div>
@@ -805,44 +863,97 @@ export default function AdminFormsPage() {
                         <span className="text-lg text-slate-400 font-normal"> / 5</span>
                       </p>
                     </div>
+                    <div>
+                      <p className="text-sm text-slate-500 mb-1">Felt Heard</p>
+                      <p className="text-3xl font-bold text-slate-900">
+                        {stats.averageScores.listenedTo || '-'}
+                        <span className="text-lg text-slate-400 font-normal"> / 5</span>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500 mb-1">Felt Understood</p>
+                      <p className="text-3xl font-bold text-slate-900">
+                        {stats.averageScores.understood || '-'}
+                        <span className="text-lg text-slate-400 font-normal"> / 5</span>
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Would Book Again */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Would Book Again (Last 30 Days)</h2>
-                  <div className="flex gap-4">
-                    {['yes', 'maybe', 'no'].map((option) => (
-                      <div key={option} className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-slate-500 capitalize">{option}</span>
-                          <span className="text-sm font-medium text-slate-700">
-                            {stats.wouldBookAgain[option] || 0}
-                          </span>
+                {/* Would Book Again & Would Recommend */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <h2 className="text-lg font-semibold text-slate-900 mb-4">Would Book Again</h2>
+                    <div className="flex gap-4">
+                      {['yes', 'unsure', 'no'].map((option) => (
+                        <div key={option} className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-slate-500 capitalize">{option}</span>
+                            <span className="text-sm font-medium text-slate-700">
+                              {stats.wouldBookAgain[option] || 0}
+                            </span>
+                          </div>
+                          <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${
+                                option === 'yes'
+                                  ? 'bg-green-500'
+                                  : option === 'unsure'
+                                    ? 'bg-yellow-500'
+                                    : 'bg-red-500'
+                              }`}
+                              style={{
+                                width: `${
+                                  ((stats.wouldBookAgain[option] || 0) /
+                                    Math.max(
+                                      1,
+                                      Object.values(stats.wouldBookAgain).reduce((a, b) => a + b, 0)
+                                    )) *
+                                  100
+                                }%`,
+                              }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${
-                              option === 'yes'
-                                ? 'bg-green-500'
-                                : option === 'maybe'
-                                  ? 'bg-yellow-500'
-                                  : 'bg-red-500'
-                            }`}
-                            style={{
-                              width: `${
-                                ((stats.wouldBookAgain[option] || 0) /
-                                  Math.max(
-                                    1,
-                                    Object.values(stats.wouldBookAgain).reduce((a, b) => a + b, 0)
-                                  )) *
-                                100
-                              }%`,
-                            }}
-                          />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <h2 className="text-lg font-semibold text-slate-900 mb-4">Would Recommend</h2>
+                    <div className="flex gap-4">
+                      {['yes', 'unsure', 'no'].map((option) => (
+                        <div key={option} className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-slate-500 capitalize">{option}</span>
+                            <span className="text-sm font-medium text-slate-700">
+                              {stats.wouldRecommend[option] || 0}
+                            </span>
+                          </div>
+                          <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${
+                                option === 'yes'
+                                  ? 'bg-green-500'
+                                  : option === 'unsure'
+                                    ? 'bg-yellow-500'
+                                    : 'bg-red-500'
+                              }`}
+                              style={{
+                                width: `${
+                                  ((stats.wouldRecommend[option] || 0) /
+                                    Math.max(
+                                      1,
+                                      Object.values(stats.wouldRecommend).reduce((a, b) => a + b, 0)
+                                    )) *
+                                  100
+                                }%`,
+                              }}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </>
@@ -873,20 +984,27 @@ function ScoreBadge({ score }: { score: number | null }) {
   );
 }
 
-function BookAgainBadge({ value }: { value: string | null }) {
+function ChoiceBadge({ value, text }: { value: string | null; text?: string | null }) {
   if (!value) return <span className="text-slate-400">-</span>;
 
   const lower = value.toLowerCase();
   const color =
     lower === 'yes'
       ? 'bg-green-100 text-green-700'
-      : lower === 'maybe'
+      : lower === 'unsure' || lower === 'maybe'
         ? 'bg-yellow-100 text-yellow-700'
         : 'bg-red-100 text-red-700';
 
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
-      {value}
-    </span>
+    <div className="flex flex-col items-center gap-1">
+      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
+        {value}
+      </span>
+      {text && (
+        <span className="text-xs text-slate-500 max-w-[120px] truncate" title={text}>
+          {text}
+        </span>
+      )}
+    </div>
   );
 }
