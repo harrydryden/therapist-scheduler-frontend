@@ -673,7 +673,7 @@ export default function AdminFormsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {submissionsData?.submissions.map((submission) => (
+                      {(submissionsData?.submissions ?? []).map((submission) => (
                         <tr key={submission.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 text-sm text-slate-600">
                             {new Date(submission.createdAt).toLocaleDateString()}
@@ -733,7 +733,7 @@ export default function AdminFormsPage() {
                   </div>
                 )}
 
-                {submissionsData?.submissions.length === 0 && (
+                {(submissionsData?.submissions ?? []).length === 0 && (
                   <p className="text-center text-slate-500 py-8">No submissions yet.</p>
                 )}
               </>
