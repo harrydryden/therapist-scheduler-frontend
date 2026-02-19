@@ -22,7 +22,7 @@ import type {
   UpdateSettingRequest,
   BulkUpdateSettingsRequest,
 } from '../types';
-import { API_BASE, getAdminSecret } from '../config/env';
+import { API_BASE, getAdminSecret, clearAdminSecret } from '../config/env';
 import { HEADERS, TIMEOUTS } from '../config/constants';
 
 // Custom error class to carry API error details
@@ -40,6 +40,23 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.code = code;
     this.details = details;
+  }
+}
+
+/**
+ * Error class for authentication failures (401, 429 auth lockout).
+ * Used to signal that the admin secret is wrong or the IP is locked out,
+ * so React Query and retry logic can skip retries.
+ */
+export class AuthError extends Error {
+  status: number;
+  retryAfter?: number;
+
+  constructor(message: string, status: number, retryAfter?: number) {
+    super(message);
+    this.name = 'AuthError';
+    this.status = status;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -87,8 +104,25 @@ async function fetchWithRetry(
     try {
       const response = await fetchWithTimeout(url, options, timeoutMs);
 
-      // If rate limited (429), use exponential backoff
+      // Never retry auth failures - these won't succeed on retry
+      if (response.status === 401 || response.status === 403) {
+        return response;
+      }
+
+      // If rate limited (429), check if it's an auth lockout before retrying
       if (response.status === 429) {
+        // Clone the response to peek at the body without consuming it
+        const cloned = response.clone();
+        try {
+          const body = await cloned.json();
+          // Auth lockout responses should not be retried
+          if (body?.error?.includes?.('authentication')) {
+            return response;
+          }
+        } catch {
+          // If we can't parse the body, fall through to normal 429 handling
+        }
+
         const retryAfter = response.headers.get('Retry-After');
         const waitTime = retryAfter
           ? parseInt(retryAfter, 10) * 1000
@@ -350,6 +384,32 @@ export async function fetchAdminApi<T>(endpoint: string, options?: RequestInit):
       );
 
       const data = await safeParseJson(response) as Record<string, unknown>;
+
+      // Handle auth failures: clear stored secret and throw AuthError
+      // so React Query stops retrying and AdminLayout shows login screen
+      if (response.status === 401 || response.status === 403) {
+        clearAdminSecret();
+        window.dispatchEvent(new Event('admin-auth-failed'));
+        throw new AuthError(
+          (data.error as string) || 'Authentication failed. Please re-enter your admin secret.',
+          response.status
+        );
+      }
+
+      if (response.status === 429) {
+        const errorMsg = (data.error as string) || '';
+        if (errorMsg.toLowerCase().includes('authentication')) {
+          // Auth lockout - clear secret so user can re-enter after lockout expires
+          clearAdminSecret();
+          window.dispatchEvent(new Event('admin-auth-failed'));
+          const retryAfter = response.headers.get('Retry-After');
+          throw new AuthError(
+            errorMsg || 'Too many failed attempts. Please try again later.',
+            429,
+            retryAfter ? parseInt(retryAfter, 10) : undefined
+          );
+        }
+      }
 
       if (!response.ok) {
         throw new Error((data.error as string) || 'An error occurred');

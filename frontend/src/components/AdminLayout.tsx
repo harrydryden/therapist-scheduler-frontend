@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { getAdminSecret, setAdminSecret } from '../config/env';
 
@@ -55,6 +55,17 @@ export default function AdminLayout() {
   const [hasSecret, setHasSecret] = useState(() => !!getAdminSecret());
   // FIX #41: Mobile sidebar toggle state
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Listen for auth failures from fetchAdminApi — when the secret is wrong
+  // or the IP is locked out, clear state and show the login screen again
+  useEffect(() => {
+    const handleAuthFailed = () => {
+      setHasSecret(false);
+      setSecretInput('');
+    };
+    window.addEventListener('admin-auth-failed', handleAuthFailed);
+    return () => window.removeEventListener('admin-auth-failed', handleAuthFailed);
+  }, []);
 
   // If no admin secret in sessionStorage, show login prompt
   if (!hasSecret) {
