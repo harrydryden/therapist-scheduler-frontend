@@ -6,6 +6,7 @@ import {
   getDashboardStats,
 } from '../api/client';
 import type { AppointmentFilters } from '../types';
+import { useDebounce } from '../hooks/useDebounce';
 import AppointmentPipeline from '../components/AppointmentPipeline';
 import AppointmentFiltersBar from '../components/AppointmentFilters';
 import TherapistGroupList from '../components/TherapistGroupList';
@@ -29,14 +30,18 @@ export default function AdminDashboardPage() {
   const [expandedTherapists, setExpandedTherapists] = useState<Set<string>>(new Set());
   const [quickFilter, setQuickFilter] = useState<'red' | 'human' | 'post-session' | 'cancelled' | null>(null);
 
+  // Debounce filter changes (date range, sort) to avoid excessive API calls
+  // Quick filter pills and page changes apply immediately via the non-debounced filters
+  const debouncedFilters = useDebounce(filters, 300);
+
   // Fetch appointments list with auto-refresh
   const {
     data: appointmentsData,
     isLoading: loadingList,
     error: listError,
   } = useQuery({
-    queryKey: ['appointments', filters],
-    queryFn: () => getAppointments(filters),
+    queryKey: ['appointments', debouncedFilters],
+    queryFn: () => getAppointments(debouncedFilters),
     refetchInterval: 30000,
     staleTime: 30000,
     refetchOnWindowFocus: false, // Polling handles freshness; avoid duplicate requests on tab switch
