@@ -25,8 +25,8 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "build": "npx tsc",
+    "typecheck": "npx tsc --noEmit"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
