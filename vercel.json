@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build:frontend",
   "outputDirectory": "packages/frontend/dist",
-  "installCommand": "npm install",
+  "installCommand": "NODE_ENV=development npm install",
   "framework": "vite",
   "rewrites": [
     { "source": "/api/:path*", "destination": "https://backend-production-fe25.up.railway.app/api/:path*" },
