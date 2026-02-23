@@ -460,7 +460,7 @@ async function start() {
     });
 
     // Cleanup stale locks from previous runs (crash recovery)
-    // These patterns cover common lock types in the application
+    // Run asynchronously to avoid blocking server startup during deploys
     const staleLockPatterns = [
       'gmail:lock:*',
       'appointment:lock:*',
@@ -468,10 +468,13 @@ async function start() {
       'weekly-mailing:lock:*',
       'stale-check:lock:*',
     ];
-    const cleanedLocks = await redis.cleanupStaleLocks(staleLockPatterns, 300);
-    if (cleanedLocks > 0) {
-      logger.info({ cleanedLocks }, 'Cleaned up stale locks from previous run');
-    }
+    redis.cleanupStaleLocks(staleLockPatterns, 300).then((cleanedLocks) => {
+      if (cleanedLocks > 0) {
+        logger.info({ cleanedLocks }, 'Cleaned up stale locks from previous run');
+      }
+    }).catch((err) => {
+      logger.warn({ err }, 'Failed to cleanup stale locks (non-fatal)');
+    });
 
     // Load persisted Slack notification queue from Redis
     const loadedSlackNotifications = await slackNotificationService.loadPersistedQueue();

@@ -5,8 +5,10 @@
 
 set -e
 
+MIGRATE_TIMEOUT=120  # seconds
+
 # Quick check: try migrate deploy first. If it works, no baseline needed.
-if npx prisma migrate deploy 2>/dev/null; then
+if timeout ${MIGRATE_TIMEOUT} npx prisma migrate deploy 2>/dev/null; then
   echo "Migrations applied successfully."
   exit 0
 fi
@@ -25,4 +27,4 @@ for dir in prisma/migrations/*/; do
 done
 
 echo "Baseline complete. Running migrate deploy..."
-npx prisma migrate deploy
+timeout ${MIGRATE_TIMEOUT} npx prisma migrate deploy
