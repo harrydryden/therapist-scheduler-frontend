@@ -470,16 +470,13 @@ class StaleCheckService {
       const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
 
       // Find conversations that should be marked stale:
-      // - lastActivityAt > 48 hours ago OR lastActivityAt is NULL (no activity ever)
+      // - lastActivityAt > 48 hours ago
       // - status is active (not confirmed/cancelled)
       // - not already marked stale
-      // FIX M8: Include NULL lastActivityAt to prevent false negatives
+      // Note: lastActivityAt is non-nullable with @default(now()), so null check is unnecessary
       const result = await prisma.appointmentRequest.updateMany({
         where: {
-          OR: [
-            { lastActivityAt: { lt: staleThreshold } },
-            { lastActivityAt: null }, // Also catch appointments with no activity recorded
-          ],
+          lastActivityAt: { lt: staleThreshold },
           status: { in: ['pending', 'contacted', 'negotiating'] },
           isStale: false,
         },
