@@ -28,7 +28,7 @@ COPY packages/frontend/ ./packages/frontend/
 RUN npx -w packages/backend prisma generate
 
 # Build shared package first, then backend, then frontend
-RUN npm run build:all
+RUN npm run build
 
 # Production stage
 FROM node:18-alpine AS production
