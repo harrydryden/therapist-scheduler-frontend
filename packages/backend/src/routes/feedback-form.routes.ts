@@ -240,43 +240,12 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
         allowHtml: false,
       });
 
-      // Extract scores from responses for easy querying
-      const safetyScore =
-        typeof responses.safety_comfort === 'number' ? responses.safety_comfort : null;
-      const listenedToScore =
-        typeof responses.listened_to === 'number' ? responses.listened_to : null;
-      const professionalScore =
-        typeof responses.professional === 'number' ? responses.professional : null;
-      const understoodScore =
-        typeof responses.understood === 'number' ? responses.understood : null;
-      const wouldBookAgain =
-        typeof responses.would_book_again === 'string'
-          ? responses.would_book_again.toLowerCase()
-          : null;
-      const wouldBookAgainText =
-        typeof responses.would_book_again_text === 'string'
-          ? sanitizeFeedback(responses.would_book_again_text)
-          : null;
-      const wouldRecommend =
-        typeof responses.would_recommend === 'string'
-          ? responses.would_recommend.toLowerCase()
-          : null;
-      const wouldRecommendText =
-        typeof responses.would_recommend_text === 'string'
-          ? sanitizeFeedback(responses.would_recommend_text)
-          : null;
-      const sessionBenefits =
-        typeof responses.session_benefits === 'string'
-          ? sanitizeFeedback(responses.session_benefits)
-          : null;
-      const improvementSuggestions =
-        typeof responses.improvement_suggestions === 'string'
-          ? sanitizeFeedback(responses.improvement_suggestions)
-          : null;
-      const additionalComments =
-        typeof responses.additional_comments === 'string'
-          ? sanitizeFeedback(responses.additional_comments)
-          : null;
+      // Get the current form version to record with the submission
+      const formConfig = await prisma.feedbackFormConfig.findUnique({
+        where: { id: 'default' },
+        select: { questionsVersion: true, questions: true },
+      });
+      const formVersion = formConfig?.questionsVersion ?? 0;
 
       // FIX: Use transaction to prevent TOCTOU race condition
       // Wrap appointment lookup, duplicate check, and create in a single transaction
@@ -312,7 +281,7 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
           }
         }
 
-        // Create feedback submission
+        // Create feedback submission - all data stored in JSONB responses column
         const submission = await tx.feedbackSubmission.create({
           data: {
             trackingCode: trackingCode?.toUpperCase() || null,
@@ -321,17 +290,7 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
             userName: appointment?.userName || null,
             therapistName: therapistName || appointment?.therapistName || 'Unknown',
             responses,
-            safetyScore,
-            listenedToScore,
-            professionalScore,
-            understoodScore,
-            wouldBookAgain,
-            wouldBookAgainText,
-            wouldRecommend,
-            wouldRecommendText,
-            sessionBenefits,
-            improvementSuggestions,
-            additionalComments,
+            formVersion,
           },
         });
 
@@ -355,31 +314,31 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
       // If linked to appointment, transition to completed using lifecycle service
       // This handles all side effects: Slack notification, Notion sync, audit trail
 
-      // Fetch form config to get the configured scale max per question (avoids hardcoded /5)
-      const formConfig = await prisma.feedbackFormConfig.findUnique({
-        where: { id: 'default' },
-        select: { questions: true },
-      });
+      // Build feedback data for Slack dynamically from form questions + responses
       const formQuestions = (formConfig?.questions as unknown as FormQuestion[]) || [];
-      const scaleMaxByQuestionId = new Map<string, number>();
+      const feedbackData: Record<string, string> = {};
       for (const q of formQuestions) {
-        if (q.type === 'scale' && q.scaleMax != null) {
-          scaleMaxByQuestionId.set(q.id, q.scaleMax);
+        const val = responses[q.id];
+        if (val == null || val === '') continue;
+
+        // Truncate long text for Slack readability
+        const label = q.question.length > 50 ? q.question.slice(0, 47) + '...' : q.question;
+
+        if (q.type === 'scale') {
+          feedbackData[label] = `${val}/${q.scaleMax ?? 5}`;
+        } else if (q.type === 'choice' || q.type === 'choice_with_text') {
+          feedbackData[label] = String(val);
+          // Include follow-up text if present
+          const textVal = responses[`${q.id}_text`];
+          if (textVal && typeof textVal === 'string') {
+            const truncated = textVal.length > 100 ? textVal.slice(0, 97) + '...' : textVal;
+            feedbackData[`${label} (Detail)`] = truncated;
+          }
+        } else if (q.type === 'text') {
+          const strVal = String(val);
+          feedbackData[label] = strVal.length > 100 ? strVal.slice(0, 97) + '...' : strVal;
         }
       }
-
-      const feedbackData: Record<string, string> = {};
-      if (safetyScore !== null) feedbackData['Safety & Comfort'] = `${safetyScore}/${scaleMaxByQuestionId.get('safety_comfort') ?? 5}`;
-      if (professionalScore !== null) feedbackData['Professionalism'] = `${professionalScore}/${scaleMaxByQuestionId.get('professional') ?? 5}`;
-      if (listenedToScore !== null) feedbackData['Felt Listened To'] = `${listenedToScore}/${scaleMaxByQuestionId.get('listened_to') ?? 5}`;
-      if (understoodScore !== null) feedbackData['Felt Understood'] = `${understoodScore}/${scaleMaxByQuestionId.get('understood') ?? 5}`;
-      if (wouldBookAgain) feedbackData['Would Book Again'] = wouldBookAgain;
-      if (wouldBookAgainText) feedbackData['Would Book Again (Detail)'] = wouldBookAgainText;
-      if (wouldRecommend) feedbackData['Would Recommend'] = wouldRecommend;
-      if (wouldRecommendText) feedbackData['Would Recommend (Detail)'] = wouldRecommendText;
-      if (sessionBenefits) feedbackData['Session Benefits'] = sessionBenefits;
-      if (improvementSuggestions) feedbackData['Improvement Suggestions'] = improvementSuggestions;
-      if (additionalComments) feedbackData['Additional Comments'] = additionalComments;
 
       if (appointment) {
         try {

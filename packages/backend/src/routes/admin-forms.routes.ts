@@ -25,6 +25,7 @@ const questionSchema = z.object({
   id: z.string().min(1),
   type: z.enum(['text', 'scale', 'choice', 'choice_with_text']),
   question: z.string().min(1),
+  helperText: z.string().optional(),
   required: z.boolean(),
   prefilled: z.boolean().optional(),
   scaleMin: z.number().optional(),
@@ -50,77 +51,76 @@ const updateFormConfigSchema = z.object({
 // Default questions used when creating or migrating the form config
 export const DEFAULT_QUESTIONS = [
   {
-    id: 'safety_comfort',
-    type: 'scale',
-    question: 'How safe and comfortable did you feel?',
+    id: 'comfortable',
+    type: 'choice_with_text',
+    question: 'Did you feel comfortable with them from the outset?',
+    helperText: 'Consider how they introduced themselves, their opening remarks, and the professionalism of their setup.',
     required: true,
-    scaleMin: 1,
-    scaleMax: 5,
-    scaleMinLabel: 'Not at all',
-    scaleMaxLabel: 'Very',
+    options: ['Yes', 'No', 'Unsure'],
+    followUpPlaceholder: 'Any additional thoughts (optional)...',
   },
   {
-    id: 'professional',
-    type: 'scale',
-    question: 'Did the session feel professionally conducted?',
+    id: 'session_structure',
+    type: 'choice_with_text',
+    question: 'Did they explain the session structure clearly?',
+    helperText: 'This includes explaining their therapeutic style, setting expectations for the session, and managing time.',
     required: true,
-    scaleMin: 1,
-    scaleMax: 5,
-    scaleMinLabel: 'Not at all',
-    scaleMaxLabel: 'Very',
+    options: ['Yes', 'No', 'Unsure'],
+    followUpPlaceholder: 'Any additional thoughts (optional)...',
   },
   {
-    id: 'listened_to',
-    type: 'scale',
-    question: 'Did you feel heard?',
+    id: 'felt_heard',
+    type: 'choice_with_text',
+    question: 'During the session, did you feel heard?',
+    helperText: 'Did you feel able to express your thoughts and concerns fully?',
     required: true,
-    scaleMin: 1,
-    scaleMax: 5,
-    scaleMinLabel: 'Not at all',
-    scaleMaxLabel: 'Very',
+    options: ['Yes', 'No', 'Unsure'],
+    followUpPlaceholder: 'Any additional thoughts (optional)...',
   },
   {
-    id: 'understood',
-    type: 'scale',
+    id: 'felt_understood',
+    type: 'choice_with_text',
     question: 'Did you feel understood?',
+    helperText: 'For example: did they summarise accurately, offer helpful perspectives, and correctly identify your emotions and behaviours?',
     required: true,
-    scaleMin: 1,
-    scaleMax: 5,
-    scaleMinLabel: 'Not at all',
-    scaleMaxLabel: 'Very',
+    options: ['Yes', 'No', 'Unsure'],
+    followUpPlaceholder: 'Any additional thoughts (optional)...',
   },
   {
-    id: 'session_benefits',
+    id: 'provided_insights',
+    type: 'choice_with_text',
+    question: 'Did the session provide new insights, strategies, or a sense of resolution?',
+    helperText: 'Did you feel the session offered significant value?',
+    required: true,
+    options: ['Yes', 'No', 'Unsure'],
+    followUpPlaceholder: 'Any additional thoughts (optional)...',
+  },
+  {
+    id: 'key_takeaways',
     type: 'text',
-    question: 'What did you get out of the session?',
-    required: false,
+    question: 'Please share the main things you took away from the session.',
+    required: true,
+  },
+  {
+    id: 'would_book_again',
+    type: 'choice_with_text',
+    question: 'Would you book another session with this therapist in the future?',
+    required: true,
+    options: ['Yes', 'No', 'Unsure'],
+    followUpPlaceholder: 'Any additional thoughts (optional)...',
+  },
+  {
+    id: 'would_recommend',
+    type: 'choice_with_text',
+    question: 'Based on this session, would you recommend Spill to someone else?',
+    required: true,
+    options: ['Yes', 'No', 'Unsure'],
+    followUpPlaceholder: 'Any additional thoughts (optional)...',
   },
   {
     id: 'improvement_suggestions',
     type: 'text',
     question: 'Is there anything that could have made the session better?',
-    required: false,
-  },
-  {
-    id: 'would_book_again',
-    type: 'choice_with_text',
-    question: 'Would you book another session with this therapist?',
-    required: true,
-    options: ['Yes', 'No', 'Unsure'],
-    followUpPlaceholder: 'Tell us more (optional)...',
-  },
-  {
-    id: 'would_recommend',
-    type: 'choice_with_text',
-    question: 'Would you recommend Spill to someone based on this session?',
-    required: true,
-    options: ['Yes', 'No', 'Unsure'],
-    followUpPlaceholder: 'Tell us more (optional)...',
-  },
-  {
-    id: 'additional_comments',
-    type: 'text',
-    question: 'Is there anything else we should know?',
     required: false,
   },
 ];
@@ -356,13 +356,20 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
 
   /**
    * GET /api/admin/forms/feedback/stats
-   * Get feedback statistics
+   * Get feedback statistics - dynamically computed from JSONB responses
    */
   fastify.get('/api/admin/forms/feedback/stats', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-      const [totalSubmissions, recentSubmissions, unsyncedCount, avgScores, wouldBookAgainCounts, wouldRecommendCounts] =
+      // Get form config to know what questions exist
+      const formConfig = await prisma.feedbackFormConfig.findUnique({
+        where: { id: 'default' },
+        select: { questions: true },
+      });
+      const questions = (formConfig?.questions as unknown as Array<{ id: string; type: string; question: string }>) || [];
+
+      const [totalSubmissions, recentSubmissions, unsyncedCount, recentResponses] =
         await Promise.all([
           prisma.feedbackSubmission.count(),
           prisma.feedbackSubmission.count({
@@ -371,61 +378,39 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
           prisma.feedbackSubmission.count({
             where: { syncedToNotion: false },
           }),
-          prisma.feedbackSubmission.aggregate({
-            _avg: {
-              safetyScore: true,
-              listenedToScore: true,
-              professionalScore: true,
-              understoodScore: true,
-            },
+          prisma.feedbackSubmission.findMany({
             where: { createdAt: { gte: thirtyDaysAgo } },
-          }),
-          prisma.feedbackSubmission.groupBy({
-            by: ['wouldBookAgain'],
-            _count: true,
-            where: {
-              createdAt: { gte: thirtyDaysAgo },
-              wouldBookAgain: { not: null },
-            },
-          }),
-          prisma.feedbackSubmission.groupBy({
-            by: ['wouldRecommend'],
-            _count: true,
-            where: {
-              createdAt: { gte: thirtyDaysAgo },
-              wouldRecommend: { not: null },
-            },
+            select: { responses: true },
           }),
         ]);
+
+      // Compute per-question breakdowns from JSONB responses
+      const questionStats: Record<string, Record<string, number>> = {};
+      for (const q of questions) {
+        if (q.type === 'choice' || q.type === 'choice_with_text') {
+          questionStats[q.id] = {};
+        }
+      }
+
+      for (const sub of recentResponses) {
+        const resp = sub.responses as Record<string, string | number>;
+        for (const q of questions) {
+          if (q.type === 'choice' || q.type === 'choice_with_text') {
+            const val = resp[q.id];
+            if (typeof val === 'string' && val) {
+              const key = val.toLowerCase();
+              questionStats[q.id][key] = (questionStats[q.id][key] || 0) + 1;
+            }
+          }
+        }
+      }
 
       return reply.send({ success: true, data: {
         totalSubmissions,
         recentSubmissions,
         unsyncedCount,
-        averageScores: {
-          safety: avgScores._avg.safetyScore?.toFixed(1) || null,
-          listenedTo: avgScores._avg.listenedToScore?.toFixed(1) || null,
-          professional: avgScores._avg.professionalScore?.toFixed(1) || null,
-          understood: avgScores._avg.understoodScore?.toFixed(1) || null,
-        },
-        wouldBookAgain: wouldBookAgainCounts.reduce(
-          (acc, item) => {
-            if (item.wouldBookAgain) {
-              acc[item.wouldBookAgain] = item._count;
-            }
-            return acc;
-          },
-          {} as Record<string, number>
-        ),
-        wouldRecommend: wouldRecommendCounts.reduce(
-          (acc, item) => {
-            if (item.wouldRecommend) {
-              acc[item.wouldRecommend] = item._count;
-            }
-            return acc;
-          },
-          {} as Record<string, number>
-        ),
+        questions: questions.map(q => ({ id: q.id, question: q.question, type: q.type })),
+        questionStats,
       } });
     } catch (error) {
       logger.error({ error }, 'Failed to get feedback stats');
@@ -494,10 +479,17 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
 
   /**
    * GET /api/admin/forms/feedback/submissions/export
-   * Export all feedback submissions as CSV
+   * Export all feedback submissions as CSV - dynamically built from form questions
    */
   fastify.get('/api/admin/forms/feedback/submissions/export', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
+      // Get form config to build CSV headers from current questions
+      const formConfig = await prisma.feedbackFormConfig.findUnique({
+        where: { id: 'default' },
+        select: { questions: true },
+      });
+      const questions = (formConfig?.questions as unknown as Array<{ id: string; type: string; question: string }>) || [];
+
       const submissions = await prisma.feedbackSubmission.findMany({
         orderBy: { createdAt: 'desc' },
         include: {
@@ -510,23 +502,15 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
         },
       });
 
-      const csvHeaders = [
-        'Date',
-        'Tracking Code',
-        'Therapist',
-        'Safety (1-5)',
-        'Professional (1-5)',
-        'Heard (1-5)',
-        'Understood (1-5)',
-        'Session Benefits',
-        'Improvements',
-        'Book Again',
-        'Book Again (Detail)',
-        'Recommend',
-        'Recommend (Detail)',
-        'Additional Comments',
-        'Synced to Notion',
-      ];
+      // Build dynamic headers: fixed columns + one column per question (+ _text for choice_with_text)
+      const csvHeaders = ['Date', 'Tracking Code', 'Therapist'];
+      for (const q of questions) {
+        csvHeaders.push(q.question);
+        if (q.type === 'choice_with_text') {
+          csvHeaders.push(`${q.question} (Detail)`);
+        }
+      }
+      csvHeaders.push('Synced to Notion');
 
       const escapeCsv = (val: string | number | null | undefined): string => {
         if (val === null || val === undefined) return '';
@@ -537,25 +521,24 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
         return str;
       };
 
-      const csvRows = submissions.map((s) => [
-        new Date(s.createdAt).toISOString().split('T')[0],
-        s.trackingCode,
-        s.therapistName,
-        s.safetyScore,
-        s.professionalScore,
-        s.listenedToScore,
-        s.understoodScore,
-        s.sessionBenefits,
-        s.improvementSuggestions,
-        s.wouldBookAgain,
-        s.wouldBookAgainText,
-        s.wouldRecommend,
-        s.wouldRecommendText,
-        s.additionalComments,
-        s.syncedToNotion ? 'Yes' : 'No',
-      ].map(escapeCsv).join(','));
+      const csvRows = submissions.map((s) => {
+        const resp = s.responses as Record<string, string | number>;
+        const row: (string | number | null)[] = [
+          new Date(s.createdAt).toISOString().split('T')[0],
+          s.trackingCode,
+          s.therapistName,
+        ];
+        for (const q of questions) {
+          row.push(resp[q.id] != null ? resp[q.id] : null);
+          if (q.type === 'choice_with_text') {
+            row.push(resp[`${q.id}_text`] != null ? resp[`${q.id}_text`] : null);
+          }
+        }
+        row.push(s.syncedToNotion ? 'Yes' : 'No');
+        return row.map(escapeCsv).join(',');
+      });
 
-      const csv = [csvHeaders.join(','), ...csvRows].join('\n');
+      const csv = [csvHeaders.map(escapeCsv).join(','), ...csvRows].join('\n');
 
       reply.header('Content-Type', 'text/csv');
       reply.header('Content-Disposition', `attachment; filename="feedback-submissions-${new Date().toISOString().split('T')[0]}.csv"`);

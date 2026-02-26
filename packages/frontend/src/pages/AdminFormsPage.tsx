@@ -24,17 +24,7 @@ interface FeedbackSubmission {
   userName: string | null;
   therapistName: string;
   responses: Record<string, string | number>;
-  safetyScore: number | null;
-  listenedToScore: number | null;
-  professionalScore: number | null;
-  understoodScore: number | null;
-  wouldBookAgain: string | null;
-  wouldBookAgainText: string | null;
-  wouldRecommend: string | null;
-  wouldRecommendText: string | null;
-  sessionBenefits: string | null;
-  improvementSuggestions: string | null;
-  additionalComments: string | null;
+  formVersion: number;
   syncedToNotion: boolean;
   createdAt: string;
   appointment?: {
@@ -49,14 +39,8 @@ interface FeedbackStats {
   totalSubmissions: number;
   recentSubmissions: number;
   unsyncedCount: number;
-  averageScores: {
-    safety: string | null;
-    listenedTo: string | null;
-    professional: string | null;
-    understood: string | null;
-  };
-  wouldBookAgain: Record<string, number>;
-  wouldRecommend: Record<string, number>;
+  questions: Array<{ id: string; question: string; type: string }>;
+  questionStats: Record<string, Record<string, number>>;
 }
 
 // ============================================
@@ -157,6 +141,18 @@ function QuestionEditor({
             onChange={(e) => onChange({ ...question, question: e.target.value })}
             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
             placeholder="Enter your question..."
+          />
+        </div>
+
+        <div>
+          <label htmlFor={`q-${question.id}-helper`} className="block text-sm font-medium text-slate-700 mb-1">Helper Text</label>
+          <input
+            type="text"
+            id={`q-${question.id}-helper`}
+            value={question.helperText || ''}
+            onChange={(e) => onChange({ ...question, helperText: e.target.value || undefined })}
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            placeholder="Optional helper text shown below the question..."
           />
         </div>
 
@@ -282,12 +278,197 @@ function StatsCard({
 }
 
 // ============================================
+// Form Preview Component
+// ============================================
+
+function FormPreview({ config }: { config: Partial<AdminFormConfig> }) {
+  const [screen, setScreen] = useState<'welcome' | 'questions' | 'thankyou'>('welcome');
+  const [currentQ, setCurrentQ] = useState(0);
+  const questions = config.questions || [];
+
+  const resetPreview = () => {
+    setScreen('welcome');
+    setCurrentQ(0);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-slate-900">Form Preview</h2>
+        <button
+          onClick={resetPreview}
+          className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+        >
+          Reset Preview
+        </button>
+      </div>
+
+      {/* Phone-like preview container */}
+      <div className="mx-auto max-w-md">
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          {/* Welcome Screen */}
+          {screen === 'welcome' && (
+            <div className="p-8">
+              <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                {config.welcomeTitle || 'Session Feedback'}
+              </h3>
+              <p className="text-lg text-gray-600 mb-6">Session with [Therapist Name]</p>
+              <div className="text-gray-600 mb-6">
+                <p className="mb-2">Hi [User Name]</p>
+                <p>{config.welcomeMessage || 'Please share your feedback.'}</p>
+              </div>
+              <button
+                onClick={() => setScreen('questions')}
+                className="w-full py-3 px-6 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+              >
+                Start Feedback
+              </button>
+            </div>
+          )}
+
+          {/* Question Screen */}
+          {screen === 'questions' && questions.length > 0 && (
+            <div className="p-8">
+              {/* Progress */}
+              <div className="mb-6">
+                <div className="flex justify-between text-sm text-gray-500 mb-2">
+                  <span>Question {currentQ + 1} of {questions.length}</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary-600 transition-all duration-300"
+                    style={{ width: `${((currentQ + 1) / questions.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Question */}
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                  {questions[currentQ].question || '(No question text)'}
+                  {questions[currentQ].required && <span className="text-red-500 ml-1">*</span>}
+                </h3>
+                {questions[currentQ].helperText && (
+                  <p className="text-sm text-gray-500 mt-1">{questions[currentQ].helperText}</p>
+                )}
+              </div>
+
+              {/* Input preview */}
+              <div className="mb-8">
+                {questions[currentQ].type === 'text' && (
+                  <div className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-400 bg-gray-50 min-h-[100px]">
+                    Type your answer...
+                  </div>
+                )}
+
+                {questions[currentQ].type === 'scale' && (
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm text-gray-500">
+                      <span>{questions[currentQ].scaleMinLabel || questions[currentQ].scaleMin || 0}</span>
+                      <span>{questions[currentQ].scaleMaxLabel || questions[currentQ].scaleMax || 5}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      {Array.from(
+                        { length: (questions[currentQ].scaleMax ?? 5) - (questions[currentQ].scaleMin ?? 0) + 1 },
+                        (_, i) => (questions[currentQ].scaleMin ?? 0) + i
+                      ).map((num) => (
+                        <div
+                          key={num}
+                          className="flex-1 py-3 rounded-lg font-medium text-center bg-gray-100 text-gray-700"
+                        >
+                          {num}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(questions[currentQ].type === 'choice' || questions[currentQ].type === 'choice_with_text') && (
+                  <div className="space-y-2">
+                    {(questions[currentQ].options || []).map((option) => (
+                      <div
+                        key={option}
+                        className="w-full py-3 px-4 rounded-lg font-medium text-left bg-gray-100 text-gray-700"
+                      >
+                        {option}
+                      </div>
+                    ))}
+                    {questions[currentQ].type === 'choice_with_text' && (
+                      <div className="mt-3 w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-400 bg-gray-50">
+                        {questions[currentQ].followUpPlaceholder || 'Tell us more (optional)...'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Nav buttons */}
+              <div className="flex gap-3">
+                {currentQ > 0 && (
+                  <button
+                    onClick={() => setCurrentQ(currentQ - 1)}
+                    className="flex-1 py-3 px-6 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    Back
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    if (currentQ < questions.length - 1) {
+                      setCurrentQ(currentQ + 1);
+                    } else {
+                      setScreen('thankyou');
+                    }
+                  }}
+                  className="flex-1 py-3 px-6 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+                >
+                  {currentQ === questions.length - 1 ? 'Submit' : 'Next'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {screen === 'questions' && questions.length === 0 && (
+            <div className="p-8 text-center text-slate-500">
+              No questions configured yet.
+            </div>
+          )}
+
+          {/* Thank You Screen */}
+          {screen === 'thankyou' && (
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                {config.thankYouTitle || 'Thank you!'}
+              </h3>
+              <p className="text-gray-600 mb-6">
+                {config.thankYouMessage || 'Thanks for your feedback.'}
+              </p>
+              <button
+                onClick={resetPreview}
+                className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+              >
+                Return Home
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // Main Page Component
 // ============================================
 
 export default function AdminFormsPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'config' | 'submissions' | 'stats'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'preview' | 'submissions' | 'stats'>('config');
 
   // Form config state
   const [editedConfig, setEditedConfig] = useState<Partial<AdminFormConfig> | null>(null);
@@ -448,6 +629,19 @@ export default function AdminFormsPage() {
             }`}
           >
             Form Configuration
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'preview'}
+            aria-controls="tab-panel-preview"
+            onClick={() => setActiveTab('preview')}
+            className={`px-4 py-2 font-medium text-sm transition-colors ${
+              activeTab === 'preview'
+                ? 'text-spill-blue-800 border-b-2 border-spill-blue-800'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Preview
           </button>
           <button
             role="tab"
@@ -682,6 +876,24 @@ export default function AdminFormsPage() {
           </div>
         )}
 
+        {/* Preview Tab */}
+        {activeTab === 'preview' && (
+          <div id="tab-panel-preview" role="tabpanel">
+            {configLoading ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-spill-grey-200 border-t-spill-blue-800 mx-auto"></div>
+                <p className="text-sm text-slate-500 mt-2">Loading form preview...</p>
+              </div>
+            ) : editedConfig ? (
+              <FormPreview config={editedConfig} />
+            ) : (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
+                <p className="text-slate-500">No form configuration loaded.</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Submissions Tab */}
         {activeTab === 'submissions' && (
           <div id="tab-panel-submissions" role="tabpanel" className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -708,73 +920,15 @@ export default function AdminFormsPage() {
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-slate-100">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Tracking Code</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Therapist</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Safety</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Professional</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Heard</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Understood</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Session Benefits</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Improvements</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Book Again?</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Recommend?</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Additional Comments</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Synced</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {(submissionsData?.submissions ?? []).map((submission) => (
-                        <tr key={submission.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">
-                            {new Date(submission.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-mono text-slate-700 whitespace-nowrap">
-                            {submission.trackingCode || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{submission.therapistName}</td>
-                          <td className="px-4 py-3 text-center">
-                            <ScoreBadge score={submission.safetyScore} />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <ScoreBadge score={submission.professionalScore} />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <ScoreBadge score={submission.listenedToScore} />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <ScoreBadge score={submission.understoodScore} />
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 max-w-[200px] truncate" title={submission.sessionBenefits || ''}>
-                            {submission.sessionBenefits || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 max-w-[200px] truncate" title={submission.improvementSuggestions || ''}>
-                            {submission.improvementSuggestions || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <ChoiceBadge value={submission.wouldBookAgain} text={submission.wouldBookAgainText} />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <ChoiceBadge value={submission.wouldRecommend} text={submission.wouldRecommendText} />
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 max-w-[200px] truncate" title={submission.additionalComments || ''}>
-                            {submission.additionalComments || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {submission.syncedToNotion ? (
-                              <span className="text-green-600">✓</span>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                {/* Dynamic submissions list - card layout for flexibility */}
+                <div className="divide-y divide-slate-100">
+                  {(submissionsData?.submissions ?? []).map((submission) => (
+                    <SubmissionCard
+                      key={submission.id}
+                      submission={submission}
+                      questions={formConfig?.questions || []}
+                    />
+                  ))}
                 </div>
 
                 {/* Pagination */}
@@ -822,7 +976,7 @@ export default function AdminFormsPage() {
             ) : stats && (
               <>
                 {/* Overview Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <StatsCard
                     label="Total Submissions"
                     value={stats.totalSubmissions}
@@ -838,124 +992,52 @@ export default function AdminFormsPage() {
                     value={stats.unsyncedCount}
                     subtext="Awaiting Notion sync"
                   />
-                  <StatsCard
-                    label="Avg Safety Score"
-                    value={stats.averageScores.safety || '-'}
-                    subtext="Out of 5"
-                  />
                 </div>
 
-                {/* Average Scores */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Average Scores (Last 30 Days)</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div>
-                      <p className="text-sm text-slate-500 mb-1">Safety & Comfort</p>
-                      <p className="text-3xl font-bold text-slate-900">
-                        {stats.averageScores.safety || '-'}
-                        <span className="text-lg text-slate-400 font-normal"> / 5</span>
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 mb-1">Professional</p>
-                      <p className="text-3xl font-bold text-slate-900">
-                        {stats.averageScores.professional || '-'}
-                        <span className="text-lg text-slate-400 font-normal"> / 5</span>
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 mb-1">Felt Heard</p>
-                      <p className="text-3xl font-bold text-slate-900">
-                        {stats.averageScores.listenedTo || '-'}
-                        <span className="text-lg text-slate-400 font-normal"> / 5</span>
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 mb-1">Felt Understood</p>
-                      <p className="text-3xl font-bold text-slate-900">
-                        {stats.averageScores.understood || '-'}
-                        <span className="text-lg text-slate-400 font-normal"> / 5</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Would Book Again & Would Recommend */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 mb-4">Would Book Again</h2>
-                    <div className="flex gap-4">
-                      {['yes', 'unsure', 'no'].map((option) => (
-                        <div key={option} className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-slate-500 capitalize">{option}</span>
-                            <span className="text-sm font-medium text-slate-700">
-                              {stats.wouldBookAgain[option] || 0}
-                            </span>
-                          </div>
-                          <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${
-                                option === 'yes'
-                                  ? 'bg-green-500'
-                                  : option === 'unsure'
-                                    ? 'bg-yellow-500'
-                                    : 'bg-red-500'
-                              }`}
-                              style={{
-                                width: `${
-                                  ((stats.wouldBookAgain[option] || 0) /
-                                    Math.max(
-                                      1,
-                                      Object.values(stats.wouldBookAgain).reduce((a, b) => a + b, 0)
-                                    )) *
-                                  100
-                                }%`,
-                              }}
-                            />
-                          </div>
+                {/* Per-Question Breakdowns */}
+                {stats.questions
+                  .filter(q => q.type === 'choice' || q.type === 'choice_with_text')
+                  .map((q) => {
+                    const qStats = stats.questionStats[q.id] || {};
+                    const total = Object.values(qStats).reduce((a, b) => a + b, 0);
+                    return (
+                      <div key={q.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                        <h2 className="text-base font-semibold text-slate-900 mb-4">{q.question}</h2>
+                        <div className="flex gap-4">
+                          {['yes', 'no', 'unsure'].map((option) => (
+                            <div key={option} className="flex-1">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-slate-500 capitalize">{option}</span>
+                                <span className="text-sm font-medium text-slate-700">
+                                  {qStats[option] || 0}
+                                </span>
+                              </div>
+                              <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${
+                                    option === 'yes'
+                                      ? 'bg-green-500'
+                                      : option === 'unsure'
+                                        ? 'bg-yellow-500'
+                                        : 'bg-red-500'
+                                  }`}
+                                  style={{
+                                    width: `${total > 0 ? ((qStats[option] || 0) / total) * 100 : 0}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })}
 
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 mb-4">Would Recommend</h2>
-                    <div className="flex gap-4">
-                      {['yes', 'unsure', 'no'].map((option) => (
-                        <div key={option} className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-slate-500 capitalize">{option}</span>
-                            <span className="text-sm font-medium text-slate-700">
-                              {stats.wouldRecommend[option] || 0}
-                            </span>
-                          </div>
-                          <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${
-                                option === 'yes'
-                                  ? 'bg-green-500'
-                                  : option === 'unsure'
-                                    ? 'bg-yellow-500'
-                                    : 'bg-red-500'
-                              }`}
-                              style={{
-                                width: `${
-                                  ((stats.wouldRecommend[option] || 0) /
-                                    Math.max(
-                                      1,
-                                      Object.values(stats.wouldRecommend).reduce((a, b) => a + b, 0)
-                                    )) *
-                                  100
-                                }%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                {stats.questions.filter(q => q.type === 'choice' || q.type === 'choice_with_text').length === 0 && (
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
+                    <p className="text-slate-500">No choice-based questions configured. Statistics will appear once submissions arrive.</p>
                   </div>
-                </div>
+                )}
               </>
             )}
           </div>
@@ -965,28 +1047,122 @@ export default function AdminFormsPage() {
   );
 }
 
-// Helper Components
+// ============================================
+// Submission Card Component
+// ============================================
 
-function ScoreBadge({ score }: { score: number | null }) {
-  if (score === null) return <span className="text-slate-400">-</span>;
-
-  const color =
-    score >= 4
-      ? 'bg-green-100 text-green-700'
-      : score >= 3
-        ? 'bg-yellow-100 text-yellow-700'
-        : 'bg-red-100 text-red-700';
+function SubmissionCard({
+  submission,
+  questions,
+}: {
+  submission: FeedbackSubmission;
+  questions: FormQuestion[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const responses = submission.responses;
 
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
-      {score}/5
-    </span>
+    <div className="px-4 py-4 hover:bg-slate-50">
+      {/* Summary row */}
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-4">
+          <div>
+            <p className="text-sm font-medium text-slate-900">{submission.therapistName}</p>
+            <p className="text-xs text-slate-500">
+              {new Date(submission.createdAt).toLocaleDateString()} &middot; {submission.trackingCode || 'No tracking code'}
+            </p>
+          </div>
+          {/* Quick summary badges for choice questions */}
+          <div className="hidden md:flex gap-1.5 flex-wrap">
+            {questions
+              .filter(q => q.type === 'choice' || q.type === 'choice_with_text')
+              .slice(0, 4)
+              .map((q) => {
+                const val = responses[q.id];
+                if (!val || typeof val !== 'string') return null;
+                return (
+                  <ChoiceBadge key={q.id} value={val} />
+                );
+              })}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {submission.syncedToNotion ? (
+            <span className="text-green-600 text-xs">Synced</span>
+          ) : (
+            <span className="text-slate-400 text-xs">Unsynced</span>
+          )}
+          <svg
+            className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div className="mt-4 pl-0 space-y-3 border-t border-slate-100 pt-4">
+          {questions.map((q) => {
+            const val = responses[q.id];
+            const textVal = responses[`${q.id}_text`];
+            if (val == null && textVal == null) return null;
+
+            return (
+              <div key={q.id}>
+                <p className="text-xs font-medium text-slate-500 mb-0.5">{q.question}</p>
+                {(q.type === 'choice' || q.type === 'choice_with_text') && val && (
+                  <div className="flex items-start gap-2">
+                    <ChoiceBadge value={String(val)} />
+                    {textVal && typeof textVal === 'string' && (
+                      <p className="text-sm text-slate-600">{textVal}</p>
+                    )}
+                  </div>
+                )}
+                {q.type === 'scale' && val != null && (
+                  <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                    {val}/{q.scaleMax ?? 5}
+                  </span>
+                )}
+                {q.type === 'text' && val && (
+                  <p className="text-sm text-slate-700">{String(val)}</p>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Show any responses not matching current questions (from older form versions) */}
+          {Object.keys(responses).filter(k => {
+            if (k.endsWith('_text')) return false;
+            return !questions.some(q => q.id === k);
+          }).length > 0 && (
+            <div className="pt-2 border-t border-slate-50">
+              <p className="text-xs font-medium text-slate-400 mb-1">Other responses</p>
+              {Object.entries(responses)
+                .filter(([k]) => !k.endsWith('_text') && !questions.some(q => q.id === k))
+                .map(([k, v]) => (
+                  <div key={k} className="mb-1">
+                    <span className="text-xs text-slate-500">{k}: </span>
+                    <span className="text-sm text-slate-700">{String(v)}</span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
-function ChoiceBadge({ value, text }: { value: string | null; text?: string | null }) {
-  if (!value) return <span className="text-slate-400">-</span>;
+// Helper Components
 
+function ChoiceBadge({ value }: { value: string }) {
   const lower = value.toLowerCase();
   const color =
     lower === 'yes'
@@ -996,15 +1172,8 @@ function ChoiceBadge({ value, text }: { value: string | null; text?: string | nu
         : 'bg-red-100 text-red-700';
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
-        {value}
-      </span>
-      {text && (
-        <span className="text-xs text-slate-500 max-w-[120px] truncate" title={text}>
-          {text}
-        </span>
-      )}
-    </div>
+    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
+      {value}
+    </span>
   );
 }
