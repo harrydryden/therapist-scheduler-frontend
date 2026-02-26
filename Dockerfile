@@ -1,5 +1,8 @@
 FROM node:18-alpine AS builder
 
+# Prisma requires OpenSSL to run its schema and migration engines on Alpine
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
 # Copy root workspace config and lock file
@@ -35,8 +38,8 @@ FROM node:18-alpine AS production
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init for proper signal handling and OpenSSL for Prisma migrations
+RUN apk add --no-cache dumb-init openssl
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
