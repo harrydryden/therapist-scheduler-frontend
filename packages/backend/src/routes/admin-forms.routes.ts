@@ -245,7 +245,6 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
     Querystring: {
       page?: string;
       limit?: string;
-      synced?: string;
       therapist?: string;
       trackingCode?: string;
       from?: string;
@@ -253,7 +252,7 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
     };
   }>('/api/admin/forms/feedback/submissions', async (request, reply) => {
     try {
-      const { page = '1', limit = '20', synced, therapist, trackingCode, from, to } = request.query;
+      const { page = '1', limit = '20', therapist, trackingCode, from, to } = request.query;
 
       const pageNum = Math.max(1, parseInt(page, 10) || 1);
       const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
@@ -506,7 +505,6 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
           csvHeaders.push(`${q.question} (Detail)`);
         }
       }
-
 
       const escapeCsv = (val: string | number | null | undefined): string => {
         if (val === null || val === undefined) return '';
