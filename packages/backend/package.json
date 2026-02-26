@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc",
-    "postinstall": "prisma generate",
     "start": "sh prisma/baseline.sh && node dist/server.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -44,7 +43,6 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@railway/cli": "^4.27.5",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.11.0",
     "@types/uuid": "^9.0.7",
