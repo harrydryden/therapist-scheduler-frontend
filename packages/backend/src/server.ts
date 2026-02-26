@@ -511,7 +511,13 @@ async function start() {
       'Server started'
     );
   } catch (err) {
-    logger.fatal({ err }, 'Failed to start server');
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    logger.fatal({ err }, `Failed to start server: ${errorMessage}`);
+    // Also log to stderr so Railway captures the error details even if pino JSON is truncated
+    console.error('FATAL: Failed to start server:', errorMessage);
+    if (err instanceof Error && err.stack) {
+      console.error(err.stack);
+    }
     process.exit(1);
   }
 }
