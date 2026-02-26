@@ -284,24 +284,24 @@ async function testSubmitFeedback(trackingCode: string | null, therapistName: st
   console.log('\n  Filling out feedback form...');
 
   // Prepare form responses - filling out all required fields
-  const formResponses = {
-    // Q1: Confirm therapist name (text, required, prefilled)
-    therapist_confirmation: therapistName,
-    // Q2: How safe and comfortable did you feel? (scale 0-5, required)
-    safety_comfort: 5,
-    // Q3: Did you feel listened to? (scale 0-5, required)
-    listened_to: 4,
-    // Q4: Did the session feel professionally conducted? (scale 0-5, required)
-    professional: 5,
-    // Q5: Would you book another session? (choice: Yes/Maybe/No, required)
+  const formResponses: Record<string, string | number> = {
+    comfortable: 'Yes',
+    session_structure: 'Yes',
+    felt_heard: 'Yes',
+    felt_understood: 'Yes',
+    provided_insights: 'Yes',
+    key_takeaways: 'I learned helpful coping strategies and felt validated in my experiences.',
     would_book_again: 'Yes',
+    would_recommend: 'Yes',
+    improvement_suggestions: 'Nothing - it was great.',
   };
 
   console.log('  Form responses:');
-  console.log(`    - Therapist confirmation: "${formResponses.therapist_confirmation}"`);
-  console.log(`    - Safety & comfort: ${formResponses.safety_comfort}/5`);
-  console.log(`    - Felt listened to: ${formResponses.listened_to}/5`);
-  console.log(`    - Professional: ${formResponses.professional}/5`);
+  console.log(`    - Comfortable: ${formResponses.comfortable}`);
+  console.log(`    - Session structure: ${formResponses.session_structure}`);
+  console.log(`    - Felt heard: ${formResponses.felt_heard}`);
+  console.log(`    - Felt understood: ${formResponses.felt_understood}`);
+  console.log(`    - Provided insights: ${formResponses.provided_insights}`);
   console.log(`    - Would book again: ${formResponses.would_book_again}`);
 
   console.log(`  Submitting with tracking code: ${trackingCode || 'none'}`);

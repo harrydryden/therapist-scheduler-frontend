@@ -373,27 +373,12 @@ model FeedbackSubmission {
   userName      String? @map("user_name")
   therapistName String  @map("therapist_name")
 
-  // Form responses (JSON object with question id -> response)
+  // Form responses (JSON object with question id -> response value)
+  // All answers stored here - no hardcoded columns, so form questions can change freely
   responses Json
 
-  // Computed scores for easy querying
-  safetyScore       Int?    @map("safety_score") // 0-5
-  listenedToScore   Int?    @map("listened_to_score") // 0-5 ("Did you feel heard?")
-  professionalScore Int?    @map("professional_score") // 0-5
-  understoodScore   Int?    @map("understood_score") // 0-5 ("Did you feel understood?")
-  wouldBookAgain    String? @map("would_book_again") // "yes", "no", "unsure"
-  wouldBookAgainText String? @map("would_book_again_text") @db.Text
-  wouldRecommend    String? @map("would_recommend") // "yes", "no", "unsure"
-  wouldRecommendText String? @map("would_recommend_text") @db.Text
-  sessionBenefits   String? @map("session_benefits") @db.Text
-  improvementSuggestions String? @map("improvement_suggestions") @db.Text
-  additionalComments String? @map("additional_comments") @db.Text
-
-  // Sync status
-  syncedToNotion Boolean   @default(false) @map("synced_to_notion")
-  notionPageId   String?   @map("notion_page_id")
-  syncedAt       DateTime? @map("synced_at")
-  syncError      String?   @map("sync_error")
+  // Tracks which form version was used, so we can interpret responses correctly
+  formVersion Int @default(0) @map("form_version")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -404,7 +389,6 @@ model FeedbackSubmission {
   @@index([appointmentRequestId])
   @@index([userEmail])
   @@index([therapistName])
-  @@index([syncedToNotion])
   @@index([createdAt])
   @@map("feedback_submissions")
 }

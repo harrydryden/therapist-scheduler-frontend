@@ -6,6 +6,7 @@ export interface FormQuestion {
   id: string;
   type: 'text' | 'scale' | 'choice' | 'choice_with_text';
   question: string;
+  helperText?: string;
   required: boolean;
   prefilled?: boolean;
   scaleMin?: number;

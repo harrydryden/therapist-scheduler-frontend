@@ -15,11 +15,8 @@
  * 2. User Sync (TO Notion) - Every 6 hours
  *    - Syncs user data to Notion users database
  *
- * 3. Feedback Write Sync (TO Notion) - Every 5 min
- *    - Writes native feedback form submissions to Notion
- *
- * 4. Feedback Read Sync (FROM Notion) - Every 30 min
- *    - Reads feedback entries from Notion to mark appointments completed
+ * 3. Appointment Lifecycle Tick - Every 30 min
+ *    - Transitions confirmed appointments to session_held after session time
  */
 
 import { notionClientManager } from '../utils/notion-client';
