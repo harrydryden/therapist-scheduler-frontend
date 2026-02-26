@@ -369,14 +369,11 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
       });
       const questions = (formConfig?.questions as unknown as Array<{ id: string; type: string; question: string }>) || [];
 
-      const [totalSubmissions, recentSubmissions, unsyncedCount, recentResponses] =
+      const [totalSubmissions, recentSubmissions, recentResponses] =
         await Promise.all([
           prisma.feedbackSubmission.count(),
           prisma.feedbackSubmission.count({
             where: { createdAt: { gte: thirtyDaysAgo } },
-          }),
-          prisma.feedbackSubmission.count({
-            where: { syncedToNotion: false },
           }),
           prisma.feedbackSubmission.findMany({
             where: { createdAt: { gte: thirtyDaysAgo } },
@@ -408,7 +405,6 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true, data: {
         totalSubmissions,
         recentSubmissions,
-        unsyncedCount,
         questions: questions.map(q => ({ id: q.id, question: q.question, type: q.type })),
         questionStats,
       } });
@@ -510,7 +506,7 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
           csvHeaders.push(`${q.question} (Detail)`);
         }
       }
-      csvHeaders.push('Synced to Notion');
+
 
       const escapeCsv = (val: string | number | null | undefined): string => {
         if (val === null || val === undefined) return '';
@@ -534,7 +530,6 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
             row.push(resp[`${q.id}_text`] != null ? resp[`${q.id}_text`] : null);
           }
         }
-        row.push(s.syncedToNotion ? 'Yes' : 'No');
         return row.map(escapeCsv).join(',');
       });
 

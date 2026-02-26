@@ -25,7 +25,6 @@ interface FeedbackSubmission {
   therapistName: string;
   responses: Record<string, string | number>;
   formVersion: number;
-  syncedToNotion: boolean;
   createdAt: string;
   appointment?: {
     id: string;
@@ -38,7 +37,6 @@ interface FeedbackSubmission {
 interface FeedbackStats {
   totalSubmissions: number;
   recentSubmissions: number;
-  unsyncedCount: number;
   questions: Array<{ id: string; question: string; type: string }>;
   questionStats: Record<string, Record<string, number>>;
 }
@@ -976,7 +974,7 @@ export default function AdminFormsPage() {
             ) : stats && (
               <>
                 {/* Overview Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <StatsCard
                     label="Total Submissions"
                     value={stats.totalSubmissions}
@@ -986,11 +984,6 @@ export default function AdminFormsPage() {
                     label="Last 30 Days"
                     value={stats.recentSubmissions}
                     subtext="Recent activity"
-                  />
-                  <StatsCard
-                    label="Pending Sync"
-                    value={stats.unsyncedCount}
-                    subtext="Awaiting Notion sync"
                   />
                 </div>
 
@@ -1090,11 +1083,6 @@ function SubmissionCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {submission.syncedToNotion ? (
-            <span className="text-green-600 text-xs">Synced</span>
-          ) : (
-            <span className="text-slate-400 text-xs">Unsynced</span>
-          )}
           <svg
             className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
             fill="none"

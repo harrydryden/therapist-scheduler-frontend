@@ -380,12 +380,6 @@ model FeedbackSubmission {
   // Tracks which form version was used, so we can interpret responses correctly
   formVersion Int @default(0) @map("form_version")
 
-  // Sync status
-  syncedToNotion Boolean   @default(false) @map("synced_to_notion")
-  notionPageId   String?   @map("notion_page_id")
-  syncedAt       DateTime? @map("synced_at")
-  syncError      String?   @map("sync_error")
-
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
@@ -395,7 +389,6 @@ model FeedbackSubmission {
   @@index([appointmentRequestId])
   @@index([userEmail])
   @@index([therapistName])
-  @@index([syncedToNotion])
   @@index([createdAt])
   @@map("feedback_submissions")
 }

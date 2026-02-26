@@ -17,7 +17,7 @@ import { logger } from '../utils/logger';
 import { appointmentLifecycleService } from '../services/appointment-lifecycle.service';
 import { slackNotificationService } from '../services/slack-notification.service';
 import { runBackgroundTask } from '../utils/background-task';
-import { sanitizeFeedback, sanitizeName, sanitizeObject } from '../utils/input-sanitizer';
+import { sanitizeName, sanitizeObject } from '../utils/input-sanitizer';
 import { RATE_LIMITS } from '../constants';
 import type { FormQuestion, FormConfig } from '@therapist-scheduler/shared/types/feedback';
 
