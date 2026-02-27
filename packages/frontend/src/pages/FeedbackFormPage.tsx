@@ -287,8 +287,6 @@ export default function FeedbackFormPage() {
   const handleNext = () => {
     if (!formConfig) return;
 
-    const currentQuestion = formConfig.questions[currentQuestionIndex];
-
     // Validate current question before proceeding
     if (currentQuestionIndex >= 0 && !isCurrentQuestionAnswered()) {
       return;
@@ -479,6 +477,7 @@ export default function FeedbackFormPage() {
   // Question screen
   const currentQuestion = formConfig.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / formConfig.questions.length) * 100;
+  const canProceed = isCurrentQuestionAnswered();
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -570,10 +569,10 @@ export default function FeedbackFormPage() {
 
           <button
             onClick={handleNext}
-            disabled={!isCurrentQuestionAnswered() || isSubmitting}
+            disabled={!canProceed || isSubmitting}
             className={`
               flex-1 py-3 px-6 rounded-lg font-medium transition-colors
-              ${!isCurrentQuestionAnswered()
+              ${!canProceed
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-primary-600 text-white hover:bg-primary-700'
               }
