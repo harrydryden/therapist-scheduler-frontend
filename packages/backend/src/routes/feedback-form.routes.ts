@@ -78,6 +78,7 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
         thankYouMessage: config.thankYouMessage,
         questions: config.questions as unknown as FormQuestion[],
         isActive: config.isActive,
+        requireExplanationFor: (config.requireExplanationFor as string[]) ?? ['No', 'Unsure'],
       };
 
       return reply.send({ form: formConfig, prefilled: null });
@@ -157,6 +158,7 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
           thankYouMessage: config.thankYouMessage,
           questions: config.questions as unknown as FormQuestion[],
           isActive: config.isActive,
+          requireExplanationFor: (config.requireExplanationFor as string[]) ?? ['No', 'Unsure'],
         };
 
         // If no appointment found, return form without prefilled data

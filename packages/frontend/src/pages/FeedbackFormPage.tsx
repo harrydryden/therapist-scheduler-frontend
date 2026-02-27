@@ -140,27 +140,29 @@ function ChoiceQuestion({
   );
 }
 
-function isNegativeOrUnsure(value: string | null): boolean {
+function requiresExplanation(value: string | null, requireExplanationFor: string[]): boolean {
   if (!value) return false;
   const lower = value.toLowerCase();
-  return lower === 'no' || lower === 'unsure';
+  return requireExplanationFor.some((opt) => opt.toLowerCase() === lower);
 }
 
 function ChoiceWithTextQuestion({
   question,
   choiceValue,
   textValue,
+  requireExplanationFor,
   onChoiceChange,
   onTextChange,
 }: {
   question: FormQuestion;
   choiceValue: string | null;
   textValue: string;
+  requireExplanationFor: string[];
   onChoiceChange: (value: string) => void;
   onTextChange: (value: string) => void;
 }) {
   const options = question.options || [];
-  const textRequired = isNegativeOrUnsure(choiceValue);
+  const textRequired = requiresExplanation(choiceValue, requireExplanationFor);
 
   return (
     <div className="space-y-4">
@@ -350,9 +352,9 @@ export default function FeedbackFormPage() {
       return false;
     }
 
-    // For choice_with_text, require explanation when answer is No or Unsure
+    // For choice_with_text, require explanation for configured answers
     // (applies even for non-required questions — if they chose to answer, they must explain)
-    if (currentQuestion.type === 'choice_with_text' && isNegativeOrUnsure(response as string)) {
+    if (currentQuestion.type === 'choice_with_text' && requiresExplanation(response as string, formConfig.requireExplanationFor)) {
       const textResponse = responses[`${currentQuestion.id}_text`] as string | undefined;
       if (!textResponse || !textResponse.trim()) return false;
     }
@@ -548,6 +550,7 @@ export default function FeedbackFormPage() {
               question={currentQuestion}
               choiceValue={(responses[currentQuestion.id] as string) || null}
               textValue={(responses[`${currentQuestion.id}_text`] as string) || ''}
+              requireExplanationFor={formConfig.requireExplanationFor}
               onChoiceChange={(value) => handleResponseChange(currentQuestion.id, value)}
               onTextChange={(value) => handleResponseChange(`${currentQuestion.id}_text`, value)}
             />

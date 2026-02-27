@@ -26,4 +26,6 @@ export interface FormConfig {
   thankYouMessage: string;
   questions: FormQuestion[];
   isActive: boolean;
+  /** Which choice answers require an explanation (e.g. ["No", "Unsure"]). Compared case-insensitively. */
+  requireExplanationFor: string[];
 }

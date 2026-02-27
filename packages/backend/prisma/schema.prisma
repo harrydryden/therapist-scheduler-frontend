@@ -351,8 +351,9 @@ model FeedbackFormConfig {
   questionsVersion Int  @default(0) @map("questions_version")
 
   // Settings
-  isActive     Boolean @default(true) @map("is_active")
-  requiresAuth Boolean @default(false) @map("requires_auth") // If true, requires valid SPL code
+  isActive              Boolean @default(true) @map("is_active")
+  requiresAuth          Boolean @default(false) @map("requires_auth") // If true, requires valid SPL code
+  requireExplanationFor Json    @default("[\"No\", \"Unsure\"]") @map("require_explanation_for") // Which choice answers require explanation text
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
