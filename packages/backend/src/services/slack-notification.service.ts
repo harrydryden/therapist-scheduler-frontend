@@ -661,6 +661,11 @@ class SlackNotificationService {
       ? `Session completed, feedback received. <${formsUrl}|View Feedback>`
       : 'Session completed.';
 
+    // Place therapist in the details block so it renders above the
+    // feedback header — sendAlert would otherwise append it *after*
+    // the "📋 Feedback:" line, making it look like a feedback answer.
+    details += `\n*Therapist:* ${escapeSlackMrkdwn(therapistName)}`;
+
     const hasFeedback = feedbackData && Object.keys(feedbackData).length > 0;
 
     // Add a visual separator before feedback answers so they don't
@@ -683,11 +688,12 @@ class SlackNotificationService {
       fallbackSuffix = ` | ${summaryParts.join(' | ')}`;
     }
 
+    // therapistName intentionally omitted — already embedded in details
+    // above so it renders before the feedback section, not inside it.
     return this.sendAlert({
       title: 'Appointment Completed',
       severity: 'low',
       appointmentId,
-      therapistName,
       details,
       emoji: '✅',
       additionalFields: hasFeedback ? feedbackData : undefined,

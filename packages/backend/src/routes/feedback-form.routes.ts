@@ -343,13 +343,21 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
       // follow-up explanation is merged inline (e.g. 'No — "reason"') rather than
       // creating a separate "(Detail)" entry, which keeps messages compact and avoids
       // duplicating the question label.
+      //
+      // Truncation limits are intentionally tight because these values are rendered
+      // inline in a single Slack section block (3 000-char limit). The full,
+      // unabridged responses are always accessible via the admin forms dashboard.
+      const LABEL_MAX = 50;
+      const CHOICE_TEXT_MAX = 80;
+      const FREE_TEXT_MAX = 100;
+
       const formQuestions = (formConfig?.questions as unknown as FormQuestion[]) || [];
       const feedbackData: Record<string, string> = {};
       for (const q of formQuestions) {
         const val = responses[q.id];
         if (val == null || val === '') continue;
 
-        const label = q.question.length > 50 ? q.question.slice(0, 47) + '...' : q.question;
+        const label = q.question.length > LABEL_MAX ? q.question.slice(0, LABEL_MAX - 3) + '...' : q.question;
 
         if (q.type === 'scale') {
           feedbackData[label] = `${val}/${q.scaleMax ?? 5}`;
@@ -357,13 +365,13 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
           let answer = String(val);
           const textVal = responses[`${q.id}_text`];
           if (textVal && typeof textVal === 'string' && textVal.trim()) {
-            const truncated = textVal.length > 120 ? textVal.slice(0, 117) + '...' : textVal;
+            const truncated = textVal.length > CHOICE_TEXT_MAX ? textVal.slice(0, CHOICE_TEXT_MAX - 3) + '...' : textVal;
             answer += ` — "${truncated}"`;
           }
           feedbackData[label] = answer;
         } else if (q.type === 'text') {
           const strVal = String(val);
-          feedbackData[label] = strVal.length > 150 ? strVal.slice(0, 147) + '...' : strVal;
+          feedbackData[label] = strVal.length > FREE_TEXT_MAX ? strVal.slice(0, FREE_TEXT_MAX - 3) + '...' : strVal;
         }
       }
 
