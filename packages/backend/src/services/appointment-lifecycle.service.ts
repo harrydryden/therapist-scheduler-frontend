@@ -3,8 +3,18 @@
  *
  * THE SINGLE SOURCE OF TRUTH for all appointment status transitions.
  *
+ * State machine (every transition is enforced atomically via status preconditions):
+ *
+ *   pending → contacted → negotiating → confirmed → session_held → feedback_requested → completed
+ *                 ↑              ↑           ↑ (reschedule)
+ *                 └──────────────┘           │
+ *                       ↑                    │
+ *                       └────────────────────┘ (confirmed also accepts feedback_requested via admin)
+ *
+ *   Any active status → cancelled  (all except completed and cancelled)
+ *
  * This service centralizes:
- * - Status transitions (pending → contacted → negotiating → confirmed → completed/cancelled)
+ * - Status transitions with atomic preconditions (prevents TOCTOU races)
  * - Email notifications (client + therapist)
  * - Slack notifications
  * - Audit trail (conversation state updates)
@@ -427,7 +437,7 @@ class AppointmentLifecycleService {
   }
 
   /**
-   * Transition: * → confirmed
+   * Transition: pending | contacted | negotiating | confirmed (reschedule) → confirmed
    *
    * Handles all side effects:
    * - Updates appointment record
@@ -450,6 +460,14 @@ class AppointmentLifecycleService {
     } = params;
 
     const logContext = { appointmentId, source, adminId };
+
+    // Valid source statuses for confirmation (forward progress + reschedule)
+    const validFromStatuses = [
+      APPOINTMENT_STATUS.PENDING,
+      APPOINTMENT_STATUS.CONTACTED,
+      APPOINTMENT_STATUS.NEGOTIATING,
+      APPOINTMENT_STATUS.CONFIRMED, // Reschedule
+    ];
 
     // Get current appointment state with all needed fields
     const appointment = await prisma.appointmentRequest.findUnique({
@@ -481,6 +499,15 @@ class AppointmentLifecycleService {
     ) {
       logger.debug(logContext, 'Appointment already confirmed with same datetime - skipping');
       return { success: true, previousStatus, newStatus: APPOINTMENT_STATUS.CONFIRMED, skipped: true };
+    }
+
+    // Validate source status — reject transitions from terminal/post-session states
+    if (!validFromStatuses.includes(previousStatus)) {
+      logger.warn(
+        { ...logContext, currentStatus: previousStatus },
+        `Invalid transition: ${previousStatus} → confirmed`
+      );
+      throw new InvalidTransitionError(previousStatus, 'confirmed');
     }
 
     const wasConfirmed = appointment.status === APPOINTMENT_STATUS.CONFIRMED;
@@ -564,11 +591,27 @@ class AppointmentLifecycleService {
 
       logger.info({ ...logContext }, 'Appointment confirmed atomically');
     } else {
-      // Standard non-atomic update
-      await prisma.appointmentRequest.update({
-        where: { id: appointmentId },
+      // Non-atomic update with status precondition for consistency
+      const updateResult = await prisma.appointmentRequest.updateMany({
+        where: {
+          id: appointmentId,
+          status: { in: validFromStatuses },
+        },
         data: updateData,
       });
+
+      if (updateResult.count === 0) {
+        // Status changed between our read and write — re-read to provide accurate error
+        const current = await prisma.appointmentRequest.findUnique({
+          where: { id: appointmentId },
+          select: { status: true },
+        });
+        logger.warn(
+          { ...logContext, currentStatus: current?.status, readStatus: previousStatus },
+          'Confirmation failed - status changed between read and write'
+        );
+        throw new InvalidTransitionError(current?.status || previousStatus, 'confirmed');
+      }
     }
 
     // Add audit trail
@@ -778,14 +821,25 @@ class AppointmentLifecycleService {
       return { success: true, previousStatus, newStatus: APPOINTMENT_STATUS.SESSION_HELD, skipped: true };
     }
 
-    // Update appointment
-    await prisma.appointmentRequest.update({
-      where: { id: appointmentId },
+    // Atomic update with status precondition — only confirmed → session_held is valid
+    const result = await prisma.appointmentRequest.updateMany({
+      where: {
+        id: appointmentId,
+        status: APPOINTMENT_STATUS.CONFIRMED,
+      },
       data: {
         status: APPOINTMENT_STATUS.SESSION_HELD,
         updatedAt: new Date(),
       },
     });
+
+    if (result.count === 0) {
+      logger.warn(
+        { ...logContext, currentStatus: previousStatus },
+        `Invalid transition: ${previousStatus} → session_held (only confirmed allowed)`
+      );
+      throw new InvalidTransitionError(previousStatus, 'session_held');
+    }
 
     // Sync user to Notion - moves therapist from "Upcoming" to "Previous" (tracked)
     runBackgroundTask(
@@ -814,9 +868,11 @@ class AppointmentLifecycleService {
   }
 
   /**
-   * Transition: session_held → feedback_requested
+   * Transition: session_held | confirmed → feedback_requested
    *
    * Called when the feedback form email is sent.
+   * Accepts confirmed as a source status for admin-created appointments
+   * that skip directly to the feedback stage.
    */
   async transitionToFeedbackRequested(params: TransitionToFeedbackRequestedParams): Promise<TransitionResult> {
     const { appointmentId, source, adminId } = params;
@@ -843,15 +899,27 @@ class AppointmentLifecycleService {
       return { success: true, previousStatus, newStatus: APPOINTMENT_STATUS.FEEDBACK_REQUESTED, skipped: true };
     }
 
-    // Update appointment
-    await prisma.appointmentRequest.update({
-      where: { id: appointmentId },
+    // Atomic update with status precondition — session_held or confirmed → feedback_requested
+    const validFromStatuses = [APPOINTMENT_STATUS.SESSION_HELD, APPOINTMENT_STATUS.CONFIRMED];
+    const result = await prisma.appointmentRequest.updateMany({
+      where: {
+        id: appointmentId,
+        status: { in: validFromStatuses },
+      },
       data: {
         status: APPOINTMENT_STATUS.FEEDBACK_REQUESTED,
         feedbackFormSentAt: new Date(),
         updatedAt: new Date(),
       },
     });
+
+    if (result.count === 0) {
+      logger.warn(
+        { ...logContext, currentStatus: previousStatus },
+        `Invalid transition: ${previousStatus} → feedback_requested (only session_held or confirmed allowed)`
+      );
+      throw new InvalidTransitionError(previousStatus, 'feedback_requested');
+    }
 
     // Add audit trail
     await this.addAuditMessage(
@@ -869,7 +937,7 @@ class AppointmentLifecycleService {
   }
 
   /**
-   * Transition: * → completed
+   * Transition: confirmed | session_held | feedback_requested → completed
    *
    * Handles all side effects:
    * - Updates appointment record (with row-level lock to prevent race conditions)
@@ -940,13 +1008,10 @@ class AppointmentLifecycleService {
         };
       }
 
-      // Validate state machine transition (soft validation - log warning but proceed)
+      // Validate state machine transition
       const validStatuses: string[] = validFromStatuses;
       if (!validStatuses.includes(appointment.status)) {
-        logger.warn(
-          { ...logContext, currentStatus: appointment.status },
-          'Unusual transition to completed - proceeding anyway'
-        );
+        throw new InvalidTransitionError(appointment.status, 'completed');
       }
 
       // Build updated notes
@@ -1113,7 +1178,7 @@ class AppointmentLifecycleService {
   }
 
   /**
-   * Transition: * → cancelled
+   * Transition: pending | contacted | negotiating | confirmed | session_held | feedback_requested → cancelled
    *
    * Handles all side effects:
    * - Updates appointment record (with row-level lock to prevent race conditions)
@@ -1126,12 +1191,6 @@ class AppointmentLifecycleService {
   async transitionToCancelled(params: TransitionToCancelledParams): Promise<TransitionResult> {
     const { appointmentId, reason, cancelledBy, source, adminId, atomic } = params;
     const logContext = { appointmentId, source, adminId, cancelledBy };
-
-    // Invalid statuses to cancel from
-    const invalidFromStatuses = [
-      APPOINTMENT_STATUS.COMPLETED,
-      APPOINTMENT_STATUS.CANCELLED,
-    ];
 
     // Use serializable transaction with row-level lock for atomicity
     const result = await prisma.$transaction(async (tx) => {

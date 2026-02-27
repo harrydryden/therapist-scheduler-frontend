@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { prisma } from '../utils/database';
 import { logger } from '../utils/logger';
 import { emailProcessingService } from '../services/email-processing.service';
-import { appointmentLifecycleService } from '../services/appointment-lifecycle.service';
+import { appointmentLifecycleService, InvalidTransitionError, ConcurrentModificationError } from '../services/appointment-lifecycle.service';
 import { therapistBookingStatusService } from '../services/therapist-booking-status.service';
 import { notionSyncManager } from '../services/notion-sync-manager.service';
 import { getEmailSubject, getEmailBody } from '../utils/email-templates';
@@ -803,6 +803,21 @@ export async function adminAppointmentRoutes(fastify: FastifyInstance) {
           },
         });
       } catch (err) {
+        // Surface lifecycle validation errors as 400 (bad request) with descriptive messages
+        if (err instanceof InvalidTransitionError) {
+          logger.warn({ err, requestId, appointmentId: id }, 'Invalid status transition requested');
+          return reply.status(400).send({
+            success: false,
+            error: err.message,
+          });
+        }
+        if (err instanceof ConcurrentModificationError) {
+          logger.warn({ err, requestId, appointmentId: id }, 'Concurrent modification detected');
+          return reply.status(409).send({
+            success: false,
+            error: err.message,
+          });
+        }
         logger.error({ err, requestId, appointmentId: id }, 'Failed to update appointment');
         return reply.status(500).send({
           success: false,
