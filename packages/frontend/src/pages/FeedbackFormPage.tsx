@@ -140,6 +140,12 @@ function ChoiceQuestion({
   );
 }
 
+function isNegativeOrUnsure(value: string | null): boolean {
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  return lower === 'no' || lower === 'unsure';
+}
+
 function ChoiceWithTextQuestion({
   question,
   choiceValue,
@@ -154,6 +160,7 @@ function ChoiceWithTextQuestion({
   onTextChange: (value: string) => void;
 }) {
   const options = question.options || [];
+  const textRequired = isNegativeOrUnsure(choiceValue);
 
   return (
     <div className="space-y-4">
@@ -176,13 +183,24 @@ function ChoiceWithTextQuestion({
         ))}
       </div>
       {choiceValue && (
-        <textarea
-          value={textValue}
-          onChange={(e) => onTextChange(e.target.value)}
-          placeholder={question.followUpPlaceholder || 'Tell us more (optional)...'}
-          rows={3}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
-        />
+        <div className="space-y-1">
+          {textRequired && (
+            <p className="text-sm text-red-600 font-medium">Please explain your answer <span className="text-red-500">*</span></p>
+          )}
+          <textarea
+            value={textValue}
+            onChange={(e) => onTextChange(e.target.value)}
+            placeholder={textRequired
+              ? (question.followUpPlaceholder || 'Please tell us more...')
+              : (question.followUpPlaceholder || 'Tell us more (optional)...')}
+            rows={3}
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none ${
+              textRequired && !textValue.trim()
+                ? 'border-red-300'
+                : 'border-gray-300'
+            }`}
+          />
+        </div>
       )}
     </div>
   );
@@ -271,8 +289,7 @@ export default function FeedbackFormPage() {
 
     // Validate current question if it exists and is required
     if (currentQuestionIndex >= 0 && currentQuestion?.required) {
-      const response = responses[currentQuestion.id];
-      if (response === undefined || response === '' || response === null) {
+      if (!isCurrentQuestionAnswered()) {
         return; // Don't proceed if required field is empty
       }
     }
@@ -329,8 +346,13 @@ export default function FeedbackFormPage() {
     if (currentQuestionIndex < 0 || !formConfig) return true;
     const currentQuestion = formConfig.questions[currentQuestionIndex];
     const response = responses[currentQuestion.id];
-    // For choice_with_text, the choice itself is required but the text is optional
-    return response !== undefined && response !== '' && response !== null;
+    if (response === undefined || response === '' || response === null) return false;
+    // For choice_with_text, require explanation text when answer is No or Unsure
+    if (currentQuestion.type === 'choice_with_text' && isNegativeOrUnsure(response as string)) {
+      const textResponse = responses[`${currentQuestion.id}_text`] as string | undefined;
+      if (!textResponse || !textResponse.trim()) return false;
+    }
+    return true;
   };
 
   // Loading state
