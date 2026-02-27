@@ -46,6 +46,7 @@ const updateFormConfigSchema = z.object({
   questions: z.array(questionSchema).optional(),
   isActive: z.boolean().optional(),
   requiresAuth: z.boolean().optional(),
+  requireExplanationFor: z.array(z.string()).optional(),
 });
 
 // Default questions used when creating or migrating the form config
@@ -213,6 +214,7 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
           ...(updates.questions && { questions: updates.questions, questionsVersion: { increment: 1 } }),
           ...(updates.isActive !== undefined && { isActive: updates.isActive }),
           ...(updates.requiresAuth !== undefined && { requiresAuth: updates.requiresAuth }),
+          ...(updates.requireExplanationFor && { requireExplanationFor: updates.requireExplanationFor }),
         },
         create: {
           id: 'default',
@@ -225,6 +227,7 @@ export async function adminFormsRoutes(fastify: FastifyInstance) {
           questions: updates.questions || DEFAULT_QUESTIONS,
           isActive: updates.isActive ?? true,
           requiresAuth: updates.requiresAuth ?? true,
+          requireExplanationFor: updates.requireExplanationFor ?? ['No', 'Unsure'],
         },
       });
 

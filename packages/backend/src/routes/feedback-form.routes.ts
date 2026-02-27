@@ -78,6 +78,7 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
         thankYouMessage: config.thankYouMessage,
         questions: config.questions as unknown as FormQuestion[],
         isActive: config.isActive,
+        requireExplanationFor: (config.requireExplanationFor as string[]) ?? ['No', 'Unsure'],
       };
 
       return reply.send({ form: formConfig, prefilled: null });
@@ -157,6 +158,7 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
           thankYouMessage: config.thankYouMessage,
           questions: config.questions as unknown as FormQuestion[],
           isActive: config.isActive,
+          requireExplanationFor: (config.requireExplanationFor as string[]) ?? ['No', 'Unsure'],
         };
 
         // If no appointment found, return form without prefilled data
@@ -240,12 +242,34 @@ export async function feedbackFormRoutes(fastify: FastifyInstance) {
         allowHtml: false,
       });
 
-      // Get the current form version to record with the submission
+      // Get the current form version and config to record with the submission
       const formConfig = await prisma.feedbackFormConfig.findUnique({
         where: { id: 'default' },
-        select: { questionsVersion: true, questions: true },
+        select: { questionsVersion: true, questions: true, requireExplanationFor: true },
       });
       const formVersion = formConfig?.questionsVersion ?? 0;
+
+      // Server-side validation: enforce explanation text for configured answers
+      const requireExplanationFor = (formConfig?.requireExplanationFor as string[]) ?? ['No', 'Unsure'];
+      if (formConfig?.questions) {
+        const questions = formConfig.questions as unknown as FormQuestion[];
+        for (const q of questions) {
+          if (q.type !== 'choice_with_text') continue;
+          const choiceVal = responses[q.id];
+          if (typeof choiceVal !== 'string') continue;
+          const needsExplanation = requireExplanationFor.some(
+            (opt) => opt.toLowerCase() === choiceVal.toLowerCase()
+          );
+          if (needsExplanation) {
+            const textVal = responses[`${q.id}_text`];
+            if (!textVal || (typeof textVal === 'string' && !textVal.trim())) {
+              return reply.status(400).send({
+                error: `Please provide an explanation for "${q.question}" when answering "${choiceVal}"`,
+              });
+            }
+          }
+        }
+      }
 
       // FIX: Use transaction to prevent TOCTOU race condition
       // Wrap appointment lookup, duplicate check, and create in a single transaction

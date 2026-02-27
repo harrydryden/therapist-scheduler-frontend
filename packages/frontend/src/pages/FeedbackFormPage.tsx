@@ -140,20 +140,29 @@ function ChoiceQuestion({
   );
 }
 
+function requiresExplanation(value: string | null, requireExplanationFor: string[]): boolean {
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  return requireExplanationFor.some((opt) => opt.toLowerCase() === lower);
+}
+
 function ChoiceWithTextQuestion({
   question,
   choiceValue,
   textValue,
+  requireExplanationFor,
   onChoiceChange,
   onTextChange,
 }: {
   question: FormQuestion;
   choiceValue: string | null;
   textValue: string;
+  requireExplanationFor: string[];
   onChoiceChange: (value: string) => void;
   onTextChange: (value: string) => void;
 }) {
   const options = question.options || [];
+  const textRequired = requiresExplanation(choiceValue, requireExplanationFor);
 
   return (
     <div className="space-y-4">
@@ -176,13 +185,24 @@ function ChoiceWithTextQuestion({
         ))}
       </div>
       {choiceValue && (
-        <textarea
-          value={textValue}
-          onChange={(e) => onTextChange(e.target.value)}
-          placeholder={question.followUpPlaceholder || 'Tell us more (optional)...'}
-          rows={3}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
-        />
+        <div className="space-y-1">
+          {textRequired && (
+            <p className="text-sm text-red-600 font-medium">Please explain your answer <span className="text-red-500">*</span></p>
+          )}
+          <textarea
+            value={textValue}
+            onChange={(e) => onTextChange(e.target.value)}
+            placeholder={textRequired
+              ? (question.followUpPlaceholder || 'Please tell us more...')
+              : (question.followUpPlaceholder || 'Tell us more (optional)...')}
+            rows={3}
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none ${
+              textRequired && !textValue.trim()
+                ? 'border-red-300'
+                : 'border-gray-300'
+            }`}
+          />
+        </div>
       )}
     </div>
   );
@@ -267,14 +287,9 @@ export default function FeedbackFormPage() {
   const handleNext = () => {
     if (!formConfig) return;
 
-    const currentQuestion = formConfig.questions[currentQuestionIndex];
-
-    // Validate current question if it exists and is required
-    if (currentQuestionIndex >= 0 && currentQuestion?.required) {
-      const response = responses[currentQuestion.id];
-      if (response === undefined || response === '' || response === null) {
-        return; // Don't proceed if required field is empty
-      }
+    // Validate current question before proceeding
+    if (currentQuestionIndex >= 0 && !isCurrentQuestionAnswered()) {
+      return;
     }
 
     if (currentQuestionIndex < formConfig.questions.length - 1) {
@@ -324,13 +339,25 @@ export default function FeedbackFormPage() {
     }
   };
 
-  // Check if current question is answered
+  // Check if current question can proceed
   const isCurrentQuestionAnswered = () => {
     if (currentQuestionIndex < 0 || !formConfig) return true;
     const currentQuestion = formConfig.questions[currentQuestionIndex];
     const response = responses[currentQuestion.id];
-    // For choice_with_text, the choice itself is required but the text is optional
-    return response !== undefined && response !== '' && response !== null;
+
+    // Required questions must have a base response
+    if (currentQuestion.required && (response === undefined || response === '' || response === null)) {
+      return false;
+    }
+
+    // For choice_with_text, require explanation for configured answers
+    // (applies even for non-required questions — if they chose to answer, they must explain)
+    if (currentQuestion.type === 'choice_with_text' && requiresExplanation(response as string, formConfig.requireExplanationFor)) {
+      const textResponse = responses[`${currentQuestion.id}_text`] as string | undefined;
+      if (!textResponse || !textResponse.trim()) return false;
+    }
+
+    return true;
   };
 
   // Loading state
@@ -450,6 +477,7 @@ export default function FeedbackFormPage() {
   // Question screen
   const currentQuestion = formConfig.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / formConfig.questions.length) * 100;
+  const canProceed = isCurrentQuestionAnswered();
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -521,6 +549,7 @@ export default function FeedbackFormPage() {
               question={currentQuestion}
               choiceValue={(responses[currentQuestion.id] as string) || null}
               textValue={(responses[`${currentQuestion.id}_text`] as string) || ''}
+              requireExplanationFor={formConfig.requireExplanationFor}
               onChoiceChange={(value) => handleResponseChange(currentQuestion.id, value)}
               onTextChange={(value) => handleResponseChange(`${currentQuestion.id}_text`, value)}
             />
@@ -540,10 +569,10 @@ export default function FeedbackFormPage() {
 
           <button
             onClick={handleNext}
-            disabled={(currentQuestion.required && !isCurrentQuestionAnswered()) || isSubmitting}
+            disabled={!canProceed || isSubmitting}
             className={`
               flex-1 py-3 px-6 rounded-lg font-medium transition-colors
-              ${(currentQuestion.required && !isCurrentQuestionAnswered())
+              ${!canProceed
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-primary-600 text-white hover:bg-primary-700'
               }
