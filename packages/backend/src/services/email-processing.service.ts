@@ -717,9 +717,12 @@ export class EmailProcessingService {
 
     try {
       // Search for recent unread emails that are replies
+      // Use 3-day window to recover emails missed by push notifications.
+      // The is:unread filter ensures already-processed emails (marked read) are excluded,
+      // and maxResults caps the batch size, so the wider window is safe.
       const response = await this.gmail.users.messages.list({
         userId: 'me',
-        q: 'is:unread in:inbox newer_than:1d',
+        q: 'is:unread in:inbox newer_than:3d',
         maxResults: 20,
       });
 
@@ -1834,6 +1837,61 @@ export class EmailProcessingService {
       'Email will be skipped to prevent misdirected responses. Manual intervention required.'
     );
     return null;
+  }
+
+  /**
+   * Check a specific Gmail thread for unprocessed replies.
+   * Used by the stale check service to recover missed therapist replies
+   * that fell outside the normal polling window.
+   *
+   * Returns the number of messages successfully processed.
+   */
+  async checkThreadForUnprocessedReplies(threadId: string, traceId: string): Promise<number> {
+    if (!this.gmail) {
+      await this.initializeGmailClient();
+      if (!this.gmail) {
+        throw new Error('Gmail client not initialized');
+      }
+    }
+
+    try {
+      const threadResponse = await this.gmail.users.threads.get({
+        userId: 'me',
+        id: threadId,
+        format: 'minimal',
+      });
+
+      const messages = threadResponse.data.messages || [];
+      let processed = 0;
+
+      for (const message of messages) {
+        if (!message.id) continue;
+
+        // Only process messages that have the UNREAD label (not yet processed)
+        const labels = message.labelIds || [];
+        if (!labels.includes('UNREAD')) continue;
+
+        // Skip messages in SENT (our outgoing emails)
+        if (labels.includes('SENT') && !labels.includes('INBOX')) continue;
+
+        logger.info(
+          { traceId, threadId, messageId: message.id },
+          'Found unprocessed message in stale thread - attempting recovery'
+        );
+
+        const wasProcessed = await this.processMessage(message.id, traceId);
+        if (wasProcessed) processed++;
+      }
+
+      return processed;
+    } catch (error: any) {
+      if (error?.code === 404 || error?.status === 404) {
+        logger.warn({ traceId, threadId }, 'Thread not found during stale recovery check');
+        return 0;
+      }
+      logger.error({ traceId, threadId, error }, 'Failed to check thread for unprocessed replies');
+      return 0;
+    }
   }
 
   /**
