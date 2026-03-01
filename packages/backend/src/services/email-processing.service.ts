@@ -1910,6 +1910,85 @@ export class EmailProcessingService {
   }
 
   /**
+   * Force-reprocess a Gmail thread by clearing processed records for its messages
+   * and re-running processing. Used for admin recovery of missed or partially
+   * processed conversations.
+   *
+   * Unlike checkThreadForUnprocessedReplies (which skips already-processed messages),
+   * this method removes deduplication records first so messages get reprocessed
+   * even if they were previously marked as handled.
+   */
+  async reprocessThread(
+    threadId: string,
+    traceId: string
+  ): Promise<{ cleared: number; reprocessed: number }> {
+    if (!this.gmail) {
+      await this.initializeGmailClient();
+      if (!this.gmail) {
+        throw new Error('Gmail client not initialized');
+      }
+    }
+
+    // Fetch thread messages from Gmail
+    const threadResponse = await this.gmail.users.threads.get({
+      userId: 'me',
+      id: threadId,
+      format: 'minimal',
+    });
+
+    const messages = threadResponse.data.messages || [];
+    if (messages.length === 0) {
+      return { cleared: 0, reprocessed: 0 };
+    }
+
+    // Collect non-SENT message IDs (inbound messages we should process)
+    const inboundMessageIds: string[] = [];
+    for (const message of messages) {
+      if (!message.id) continue;
+      const labels = message.labelIds || [];
+      if (labels.includes('SENT') && !labels.includes('INBOX')) continue;
+      inboundMessageIds.push(message.id);
+    }
+
+    if (inboundMessageIds.length === 0) {
+      return { cleared: 0, reprocessed: 0 };
+    }
+
+    // Clear processed records from database
+    const { count: dbCleared } = await prisma.processedGmailMessage.deleteMany({
+      where: { id: { in: inboundMessageIds } },
+    });
+
+    // Clear from Redis (best effort)
+    let redisCleared = 0;
+    for (const messageId of inboundMessageIds) {
+      try {
+        const removed = await redis.zrem(PROCESSED_MESSAGES_KEY, messageId);
+        if (removed > 0) redisCleared++;
+        // Also clear any lingering locks
+        await redis.del(`${MESSAGE_LOCK_PREFIX}${messageId}`);
+      } catch {
+        // Redis failure is non-fatal
+      }
+    }
+
+    logger.info(
+      { traceId, threadId, inboundCount: inboundMessageIds.length, dbCleared, redisCleared },
+      'Cleared processed records for thread reprocessing'
+    );
+
+    // Now re-run the standard thread recovery which will process unprocessed messages
+    const reprocessed = await this.checkThreadForUnprocessedReplies(threadId, traceId);
+
+    logger.info(
+      { traceId, threadId, cleared: dbCleared, reprocessed },
+      'Thread reprocessing complete'
+    );
+
+    return { cleared: dbCleared, reprocessed };
+  }
+
+  /**
    * Set up Gmail push notifications (watch)
    */
   async setupPushNotifications(topicName: string): Promise<{ historyId: string; expiration: string }> {

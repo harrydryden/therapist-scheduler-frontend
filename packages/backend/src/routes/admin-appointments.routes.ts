@@ -1048,6 +1048,121 @@ export async function adminAppointmentRoutes(fastify: FastifyInstance) {
     }
   );
 
+  /**
+   * POST /api/admin/dashboard/appointments/:id/reprocess-thread
+   * Force-reprocess an appointment's Gmail threads by clearing processed records
+   * and re-running message processing. Recovers missed or partially processed replies.
+   */
+  fastify.post(
+    '/api/admin/dashboard/appointments/:id/reprocess-thread',
+    {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: 60000,
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const requestId = request.id;
+      const { id } = request.params;
+
+      logger.info({ requestId, appointmentId: id }, 'Admin triggered thread reprocessing');
+
+      try {
+        const appointment = await prisma.appointmentRequest.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            userName: true,
+            therapistName: true,
+            gmailThreadId: true,
+            therapistGmailThreadId: true,
+            status: true,
+          },
+        });
+
+        if (!appointment) {
+          return reply.status(404).send({
+            success: false,
+            error: 'Appointment not found',
+          });
+        }
+
+        if (!appointment.gmailThreadId && !appointment.therapistGmailThreadId) {
+          return reply.status(400).send({
+            success: false,
+            error: 'Appointment has no Gmail thread IDs to reprocess',
+          });
+        }
+
+        const results: Array<{ threadId: string; type: string; cleared: number; reprocessed: number }> = [];
+        const traceId = `${requestId}:admin-reprocess:${id}`;
+
+        // Reprocess therapist thread
+        if (appointment.therapistGmailThreadId) {
+          const result = await emailProcessingService.reprocessThread(
+            appointment.therapistGmailThreadId,
+            traceId
+          );
+          results.push({
+            threadId: appointment.therapistGmailThreadId,
+            type: 'therapist',
+            ...result,
+          });
+        }
+
+        // Reprocess client thread
+        if (appointment.gmailThreadId) {
+          const result = await emailProcessingService.reprocessThread(
+            appointment.gmailThreadId,
+            traceId
+          );
+          results.push({
+            threadId: appointment.gmailThreadId,
+            type: 'client',
+            ...result,
+          });
+        }
+
+        const totalCleared = results.reduce((sum, r) => sum + r.cleared, 0);
+        const totalReprocessed = results.reduce((sum, r) => sum + r.reprocessed, 0);
+
+        logger.info(
+          { requestId, appointmentId: id, results, totalCleared, totalReprocessed },
+          'Thread reprocessing complete'
+        );
+
+        return reply.send({
+          success: true,
+          data: {
+            appointmentId: id,
+            userName: appointment.userName,
+            therapistName: appointment.therapistName,
+            threads: results,
+            totalCleared,
+            totalReprocessed,
+            message: totalReprocessed > 0
+              ? `Recovered ${totalReprocessed} message(s) from ${results.length} thread(s)`
+              : `Cleared ${totalCleared} record(s) but no new messages to process`,
+          },
+        });
+      } catch (err: any) {
+        if (err?.code === 404 || err?.status === 404) {
+          return reply.status(404).send({
+            success: false,
+            error: 'Gmail thread not found — it may have been deleted',
+          });
+        }
+        logger.error({ err, requestId, appointmentId: id }, 'Failed to reprocess thread');
+        return reply.status(500).send({
+          success: false,
+          error: 'Failed to reprocess thread',
+        });
+      }
+    }
+  );
+
   // ============================================
   // Admin Appointments Management Endpoints
   // ============================================
