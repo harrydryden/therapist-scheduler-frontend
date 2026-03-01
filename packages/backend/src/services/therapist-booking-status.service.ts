@@ -1,6 +1,7 @@
 import { prisma } from '../utils/database';
 import { Prisma } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { sleep } from '../utils/timeout';
 import { THERAPIST_BOOKING } from '../constants';
 import { notionService } from './notion.service';
 
@@ -24,13 +25,6 @@ function getBackoffDelay(attempt: number): number {
   const cappedDelay = Math.min(baseDelay, SERIALIZATION_RETRY.MAX_DELAY_MS);
   const jitter = cappedDelay * SERIALIZATION_RETRY.JITTER_FACTOR * Math.random();
   return cappedDelay + jitter;
-}
-
-/**
- * Sleep for specified milliseconds
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
