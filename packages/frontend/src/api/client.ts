@@ -564,6 +564,26 @@ export async function updateAppointment(
 
 // Thread reprocessing API
 
+export interface ThreadMessagePreview {
+  messageId: string;
+  from: string;
+  subject: string;
+  date: string;
+  status: 'processed' | 'unprocessed';
+  snippet: string;
+}
+
+export interface ReprocessPreviewResult {
+  appointmentId: string;
+  userName: string;
+  therapistName: string;
+  dryRun: true;
+  threads: Array<{ threadId: string; type: string; messages: ThreadMessagePreview[] }>;
+  totalMessages: number;
+  unprocessedCount: number;
+  message: string;
+}
+
 export interface ReprocessThreadResult {
   appointmentId: string;
   userName: string;
@@ -574,14 +594,31 @@ export interface ReprocessThreadResult {
   message: string;
 }
 
-export async function reprocessThread(
+export async function previewReprocessThread(
   appointmentId: string
+): Promise<ReprocessPreviewResult> {
+  const response = await fetchAdminApi<ReprocessPreviewResult>(
+    `/admin/dashboard/appointments/${appointmentId}/reprocess-thread`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ dryRun: true }),
+    }
+  );
+  if (!response.data) {
+    throw new Error('Failed to preview thread');
+  }
+  return response.data;
+}
+
+export async function reprocessThread(
+  appointmentId: string,
+  forceMessageIds?: string[]
 ): Promise<ReprocessThreadResult> {
   const response = await fetchAdminApi<ReprocessThreadResult>(
     `/admin/dashboard/appointments/${appointmentId}/reprocess-thread`,
     {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify(forceMessageIds ? { forceMessageIds } : {}),
     }
   );
   if (!response.data) {

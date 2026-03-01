@@ -1050,24 +1050,36 @@ export async function adminAppointmentRoutes(fastify: FastifyInstance) {
 
   /**
    * POST /api/admin/dashboard/appointments/:id/reprocess-thread
-   * Force-reprocess an appointment's Gmail threads by clearing processed records
-   * and re-running message processing. Recovers missed or partially processed replies.
+   * Reprocess an appointment's Gmail threads to recover missed messages.
+   *
+   * Supports three modes via request body:
+   * - Preview (dryRun: true): Returns message list showing which are processed vs unprocessed
+   * - Safe (default): Only processes messages that were never processed
+   * - Force (forceMessageIds: [...]): Clears specific message records first, then reprocesses
    */
   fastify.post(
     '/api/admin/dashboard/appointments/:id/reprocess-thread',
     {
       config: {
         rateLimit: {
-          max: 5,
+          max: 10,
           timeWindow: 60000,
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request: FastifyRequest<{
+      Params: { id: string };
+      Body: { dryRun?: boolean; forceMessageIds?: string[] };
+    }>, reply: FastifyReply) => {
       const requestId = request.id;
       const { id } = request.params;
+      const body = (request.body || {}) as { dryRun?: boolean; forceMessageIds?: string[] };
+      const { dryRun, forceMessageIds } = body;
 
-      logger.info({ requestId, appointmentId: id }, 'Admin triggered thread reprocessing');
+      logger.info(
+        { requestId, appointmentId: id, dryRun, forceMessageIds },
+        dryRun ? 'Admin previewing thread reprocessing' : 'Admin triggered thread reprocessing'
+      );
 
       try {
         const appointment = await prisma.appointmentRequest.findUnique({
@@ -1096,14 +1108,75 @@ export async function adminAppointmentRoutes(fastify: FastifyInstance) {
           });
         }
 
-        const results: Array<{ threadId: string; type: string; cleared: number; reprocessed: number }> = [];
         const traceId = `${requestId}:admin-reprocess:${id}`;
 
-        // Reprocess therapist thread
+        // DRY RUN: Preview which messages would be reprocessed
+        if (dryRun) {
+          const preview: Array<{
+            threadId: string;
+            type: string;
+            messages: Array<{
+              messageId: string;
+              from: string;
+              subject: string;
+              date: string;
+              status: 'processed' | 'unprocessed';
+              snippet: string;
+            }>;
+          }> = [];
+
+          if (appointment.therapistGmailThreadId) {
+            const result = await emailProcessingService.previewThreadMessages(
+              appointment.therapistGmailThreadId,
+              traceId
+            );
+            preview.push({
+              threadId: appointment.therapistGmailThreadId,
+              type: 'therapist',
+              ...result,
+            });
+          }
+
+          if (appointment.gmailThreadId) {
+            const result = await emailProcessingService.previewThreadMessages(
+              appointment.gmailThreadId,
+              traceId
+            );
+            preview.push({
+              threadId: appointment.gmailThreadId,
+              type: 'client',
+              ...result,
+            });
+          }
+
+          const allMessages = preview.flatMap(p => p.messages);
+          const unprocessedCount = allMessages.filter(m => m.status === 'unprocessed').length;
+
+          return reply.send({
+            success: true,
+            data: {
+              appointmentId: id,
+              userName: appointment.userName,
+              therapistName: appointment.therapistName,
+              dryRun: true,
+              threads: preview,
+              totalMessages: allMessages.length,
+              unprocessedCount,
+              message: unprocessedCount > 0
+                ? `Found ${unprocessedCount} unprocessed message(s) that can be recovered`
+                : 'All messages in this thread have already been processed',
+            },
+          });
+        }
+
+        // REPROCESS: Safe or Force mode
+        const results: Array<{ threadId: string; type: string; cleared: number; reprocessed: number }> = [];
+
         if (appointment.therapistGmailThreadId) {
           const result = await emailProcessingService.reprocessThread(
             appointment.therapistGmailThreadId,
-            traceId
+            traceId,
+            forceMessageIds
           );
           results.push({
             threadId: appointment.therapistGmailThreadId,
@@ -1112,11 +1185,11 @@ export async function adminAppointmentRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Reprocess client thread
         if (appointment.gmailThreadId) {
           const result = await emailProcessingService.reprocessThread(
             appointment.gmailThreadId,
-            traceId
+            traceId,
+            forceMessageIds
           );
           results.push({
             threadId: appointment.gmailThreadId,
@@ -1144,7 +1217,9 @@ export async function adminAppointmentRoutes(fastify: FastifyInstance) {
             totalReprocessed,
             message: totalReprocessed > 0
               ? `Recovered ${totalReprocessed} message(s) from ${results.length} thread(s)`
-              : `Cleared ${totalCleared} record(s) but no new messages to process`,
+              : totalCleared > 0
+              ? `Cleared ${totalCleared} record(s) but no new messages found to process`
+              : 'No unprocessed messages found in this thread',
           },
         });
       } catch (err: any) {
