@@ -1,15 +1,11 @@
-import Anthropic from '@anthropic-ai/sdk';
-import {
-  RateLimitError,
-  APIConnectionError,
-  APIConnectionTimeoutError,
-  InternalServerError,
-  APIError,
-} from '@anthropic-ai/sdk';
-import { config } from '../config';
 import { MODEL_CONFIG } from '../config/models';
-import { TIMEOUTS } from '../constants';
 import { logger, logTokenUsage } from '../utils/logger';
+import { sleep } from '../utils/timeout';
+import {
+  anthropicClient,
+  isTransientError,
+  RateLimitError,
+} from '../utils/anthropic-client';
 
 export interface AIServiceParams {
   model?: string;
@@ -28,12 +24,6 @@ export interface AIResponse {
   latency: number;
 }
 
-// Initialize Anthropic client with timeout
-const anthropic = new Anthropic({
-  apiKey: config.anthropicApiKey,
-  timeout: TIMEOUTS.ANTHROPIC_API_MS,
-});
-
 /**
  * Transient error retry configuration for AI service
  */
@@ -41,29 +31,6 @@ const TRANSIENT_RETRY_CONFIG = {
   MAX_RETRIES: 2,
   RETRY_DELAYS_MS: [1000, 3000], // 1s, 3s - fast retries for extraction
 } as const;
-
-/**
- * Check if an error is transient and should be retried
- */
-function isTransientError(error: unknown): boolean {
-  if (error instanceof APIConnectionError || error instanceof APIConnectionTimeoutError) {
-    return true;
-  }
-  if (error instanceof InternalServerError) {
-    return true;
-  }
-  if (error instanceof APIError && typeof error.status === 'number') {
-    return error.status >= 500 && error.status < 600;
-  }
-  return false;
-}
-
-/**
- * Sleep for specified milliseconds
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 export class AIService {
   private model: string;
@@ -89,7 +56,7 @@ export class AIService {
 
     for (let attempt = 0; attempt <= TRANSIENT_RETRY_CONFIG.MAX_RETRIES; attempt++) {
       try {
-        const response = await anthropic.messages.create({
+        const response = await anthropicClient.messages.create({
           model: params.model || this.model,
           max_tokens: params.maxTokens || this.maxTokens,
           system: systemPrompt || undefined,

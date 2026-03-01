@@ -3,9 +3,21 @@ import { config } from '../config';
 import { NOTION_CATEGORY_PROPERTIES, type TherapistCategories } from '../config/therapist-categories';
 import { cacheManager, redis } from '../utils/redis';
 import { logger } from '../utils/logger';
+import { sleep } from '../utils/timeout';
 import { circuitBreakerRegistry, CIRCUIT_BREAKER_CONFIGS } from '../utils/circuit-breaker';
 // FIX #23: Import shared rate limiter for Notion API calls
 import { notionClientManager } from '../utils/notion-client';
+import type { TherapistAvailability } from '@therapist-scheduler/shared';
+
+// Re-export for consumers that import from notion.service
+export type { TherapistAvailability };
+
+/**
+ * Minimal type for Notion page properties we access.
+ * Using Record<string, unknown> is safer than `any` while still
+ * allowing optional chaining on Notion's dynamic property structure.
+ */
+type NotionPage = { id: string; properties: Record<string, any>; cover?: any };
 
 // Get or create the Notion API circuit breaker
 const notionCircuitBreaker = circuitBreakerRegistry.getOrCreate(CIRCUIT_BREAKER_CONFIGS.NOTION_API);
@@ -19,25 +31,16 @@ const CACHE_LOCK_TTL_SECONDS = 10; // Lock expires after 10 seconds
 const CACHE_LOCK_WAIT_MS = 50; // Polling interval while waiting
 const CACHE_LOCK_MAX_WAIT_MS = 5000; // Max time to wait for lock
 
-export interface TherapistAvailability {
-  timezone: string;
-  slots: Array<{
-    day: string;
-    start: string;
-    end: string;
-  }>;
-  exceptions?: Array<{
-    date: string;
-    available: boolean;
-  }>;
-}
-
+/**
+ * Backend-internal Therapist representation with fields not exposed publicly
+ * (email, frozen status, odId). The shared Therapist type in @therapist-scheduler/shared
+ * represents the public API contract.
+ */
 export interface Therapist {
   id: string;
-  odId: string | null; // Unique 10-digit therapist ID
+  odId: string | null;
   name: string;
   bio: string;
-  // Categorization system
   approach: string[];
   style: string[];
   areasOfFocus: string[];
@@ -45,7 +48,6 @@ export interface Therapist {
   availability: TherapistAvailability | null;
   active: boolean;
   profileImage: string | null;
-  // Freeze status (synced from booking system, admin can override in Notion)
   frozen: boolean;
 }
 
@@ -79,7 +81,7 @@ class NotionService {
     logger.debug({ key, ttl }, 'Cache set');
   }
 
-  private parseTherapistFromPage(page: any): Therapist {
+  private parseTherapistFromPage(page: NotionPage): Therapist {
     const properties = page.properties;
 
     // Extract name (title property)
@@ -92,13 +94,13 @@ class NotionService {
 
     // Extract category system (multi-select fields)
     const approachProperty = properties[NOTION_CATEGORY_PROPERTIES.APPROACH];
-    const approach = approachProperty?.multi_select?.map((s: any) => s.name) || [];
+    const approach = approachProperty?.multi_select?.map((s: { name: string }) => s.name) || [];
 
     const styleProperty = properties[NOTION_CATEGORY_PROPERTIES.STYLE];
-    const style = styleProperty?.multi_select?.map((s: any) => s.name) || [];
+    const style = styleProperty?.multi_select?.map((s: { name: string }) => s.name) || [];
 
     const areasOfFocusProperty = properties[NOTION_CATEGORY_PROPERTIES.AREAS_OF_FOCUS];
-    const areasOfFocus = areasOfFocusProperty?.multi_select?.map((s: any) => s.name) || [];
+    const areasOfFocus = areasOfFocusProperty?.multi_select?.map((s: { name: string }) => s.name) || [];
 
     // Extract email
     const emailProperty = properties.Email;
@@ -194,7 +196,7 @@ class NotionService {
         }
 
         // Another process is fetching - wait and check cache again
-        await new Promise(resolve => setTimeout(resolve, CACHE_LOCK_WAIT_MS));
+        await sleep(CACHE_LOCK_WAIT_MS);
 
         // Check if cache was populated while waiting
         const cached = await this.getFromCache<unknown>(cacheKey);
@@ -261,7 +263,7 @@ class NotionService {
         })
       );
 
-      const therapists = response.results.map((page) => this.parseTherapistFromPage(page));
+      const therapists = response.results.map((page) => this.parseTherapistFromPage(page as NotionPage));
 
       // Cache the results
       await this.setCache(CACHE_KEY_ALL, therapists);
@@ -293,7 +295,7 @@ class NotionService {
       const page = await notionCircuitBreaker.execute(() =>
         this.notion.pages.retrieve({ page_id: id })
       );
-      const therapist = this.parseTherapistFromPage(page);
+      const therapist = this.parseTherapistFromPage(page as NotionPage);
 
       // FIX M3: Use shorter TTL for single therapist (used for booking)
       // This reduces staleness for availability-critical operations

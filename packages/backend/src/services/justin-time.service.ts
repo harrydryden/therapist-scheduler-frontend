@@ -1,14 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk';
-import {
-  RateLimitError,
-  APIConnectionError,
-  APIConnectionTimeoutError,
-  InternalServerError,
-  APIError,
-} from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { config } from '../config';
 import { CLAUDE_MODELS, MODEL_CONFIG } from '../config/models';
+import {
+  anthropicClient,
+  isTransientError as isTransientApiError,
+  addJitter,
+  RateLimitError,
+} from '../utils/anthropic-client';
 import { logger } from '../utils/logger';
 import { circuitBreakerRegistry, CIRCUIT_BREAKER_CONFIGS } from '../utils/circuit-breaker';
 import { prisma } from '../utils/database';
@@ -28,6 +27,7 @@ import { checkForInjection, wrapUntrustedContent } from '../utils/content-saniti
 // Note: getEmailSubject/getEmailBody are now handled by appointmentLifecycleService
 import { getSettingValue, getSettingValues } from './settings.service';
 import { TIMEOUTS, CONVERSATION_LIMITS, CLAUDE_API, EMAIL } from '../constants';
+import { sleep } from '../utils/timeout';
 import { emailQueueService } from './email-queue.service';
 import { formatAvailabilityForUser, formatAvailabilityForEmail } from '../utils/availability-formatter';
 import { classifyEmail, needsSpecialHandling, formatClassificationForPrompt, type EmailClassification } from '../utils/email-classifier';
@@ -152,20 +152,6 @@ async function markToolExecuted(hash: string, traceId: string): Promise<void> {
   }
 }
 
-// Initialize Anthropic client with timeout
-const anthropic = new Anthropic({
-  apiKey: config.anthropicApiKey,
-  timeout: TIMEOUTS.ANTHROPIC_API_MS,
-});
-
-/**
- * Add random jitter to a delay to prevent thundering herd
- */
-function addJitter(delayMs: number, jitterFactor: number = CLAUDE_API.JITTER_FACTOR): number {
-  const jitter = delayMs * jitterFactor * Math.random();
-  return Math.floor(delayMs + jitter);
-}
-
 /**
  * Transient error retry configuration (shorter than rate limit retries)
  * These errors are typically short-lived (network blips, temporary server issues)
@@ -174,36 +160,6 @@ const TRANSIENT_ERROR_CONFIG = {
   MAX_RETRIES: 2, // Fewer retries than rate limits
   RETRY_DELAYS_MS: [2000, 5000, 10000], // 2s, 5s, 10s - shorter delays
 } as const;
-
-/**
- * Check if an error is a transient error that should be retried
- * Transient errors are temporary and likely to succeed on retry
- */
-function isTransientError(error: unknown): boolean {
-  // Connection errors (network issues, DNS, etc.)
-  if (error instanceof APIConnectionError || error instanceof APIConnectionTimeoutError) {
-    return true;
-  }
-
-  // Server errors (5xx) - typically temporary
-  if (error instanceof InternalServerError) {
-    return true;
-  }
-
-  // Generic APIError with 5xx status code
-  if (error instanceof APIError && typeof error.status === 'number') {
-    return error.status >= 500 && error.status < 600;
-  }
-
-  return false;
-}
-
-/**
- * Sleep for a specified duration
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 // Get or create the Claude API circuit breaker
 const claudeCircuitBreaker = circuitBreakerRegistry.getOrCreate(CIRCUIT_BREAKER_CONFIGS.CLAUDE_API);
@@ -306,7 +262,7 @@ async function withRateLimitRetry<T>(
         }
 
         // Check if this is a transient error (5xx, connection issues)
-        if (isTransientError(error)) {
+        if (isTransientApiError(error)) {
           transientAttempts++;
 
           // Check if we have transient retries remaining
@@ -860,7 +816,7 @@ export class JustinTimeService {
         );
 
         const response = await withRateLimitRetry(
-          () => anthropic.messages.create({
+          () => anthropicClient.messages.create({
             model: CLAUDE_MODELS.AGENT,
             max_tokens: MODEL_CONFIG.agent.maxTokens,
             system: systemPrompt,
@@ -1394,7 +1350,7 @@ ${formatClassificationForPrompt(emailClassification)}`;
         );
 
         const response = await withRateLimitRetry(
-          () => anthropic.messages.create({
+          () => anthropicClient.messages.create({
             model: CLAUDE_MODELS.AGENT,
             max_tokens: MODEL_CONFIG.agent.maxTokens,
             system: freshSystemPrompt,
@@ -2973,7 +2929,7 @@ Please answer their question helpfully and direct them to the booking URL to sch
 
       // Call Claude
       const response = await withRateLimitRetry(
-        () => anthropic.messages.create({
+        () => anthropicClient.messages.create({
           model: CLAUDE_MODELS.AGENT,
           max_tokens: MODEL_CONFIG.agent.maxTokens,
           system: systemPrompt,
