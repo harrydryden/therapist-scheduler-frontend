@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { AppointmentDetail } from '../../types';
+import type { ReprocessThreadResult } from '../../api/client';
 
 interface HumanControlSectionProps {
   appointment: AppointmentDetail;
@@ -11,6 +12,7 @@ interface HumanControlSectionProps {
   releaseControlMutation: UseMutationResult<unknown, Error, string>;
   updateAppointmentMutation: UseMutationResult<{ warning?: string }, Error, { id: string; status?: string; confirmedDateTime?: string | null }>;
   sendMessageMutation: UseMutationResult<unknown, Error, { id: string; to: string; subject: string; body: string }>;
+  reprocessThreadMutation: UseMutationResult<ReprocessThreadResult, Error, string>;
   // Edit state (managed by parent for timeout cleanup)
   showEditPanel: boolean;
   onShowEditPanel: (show: boolean) => void;
@@ -29,6 +31,7 @@ export default function HumanControlSection({
   releaseControlMutation,
   updateAppointmentMutation,
   sendMessageMutation,
+  reprocessThreadMutation,
   showEditPanel,
   onShowEditPanel,
   editStatus,
@@ -327,6 +330,40 @@ export default function HumanControlSection({
                 </p>
               )}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Reprocess Thread — available regardless of human control state */}
+      {(appointment.gmailThreadId || appointment.therapistGmailThreadId) && (
+        <div className="mt-3 pt-3 border-t border-slate-200">
+          <button
+            onClick={() => reprocessThreadMutation.mutate(appointment.id)}
+            disabled={reprocessThreadMutation.isPending}
+            aria-label="Reprocess Gmail threads to recover missed messages"
+            aria-busy={reprocessThreadMutation.isPending}
+            className="w-full px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium disabled:opacity-50"
+          >
+            {reprocessThreadMutation.isPending ? 'Reprocessing...' : 'Reprocess Thread'}
+          </button>
+          <p className="text-xs text-slate-500 mt-1 text-center">
+            Re-scans Gmail threads for missed or partially processed messages
+          </p>
+
+          {reprocessThreadMutation.isSuccess && (
+            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-xs text-green-700">
+                {reprocessThreadMutation.data.message}
+              </p>
+            </div>
+          )}
+
+          {reprocessThreadMutation.isError && (
+            <p className="text-red-500 text-xs mt-2">
+              {reprocessThreadMutation.error instanceof Error
+                ? reprocessThreadMutation.error.message
+                : 'Failed to reprocess thread'}
+            </p>
           )}
         </div>
       )}

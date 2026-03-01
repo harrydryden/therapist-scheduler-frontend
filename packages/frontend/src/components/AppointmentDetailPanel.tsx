@@ -7,6 +7,7 @@ import {
   sendAdminMessage,
   deleteAppointment,
   updateAppointment,
+  reprocessThread,
 } from '../api/client';
 import type { AppointmentDetail } from '../types';
 import { getAdminId } from '../utils/admin-id';
@@ -180,6 +181,19 @@ export default function AppointmentDetailPanel({
     },
   });
 
+  const reprocessThreadMutation = useMutation({
+    mutationFn: (id: string) => reprocessThread(id),
+    onMutate: () => { setMutationError(null); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointment', selectedAppointment] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setMutationError(null);
+    },
+    onError: (error) => {
+      setMutationError(error instanceof Error ? error.message : 'Failed to reprocess thread');
+    },
+  });
+
   if (!selectedAppointment) {
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -232,6 +246,7 @@ export default function AppointmentDetailPanel({
             releaseControlMutation={releaseControlMutation}
             updateAppointmentMutation={updateAppointmentMutation}
             sendMessageMutation={sendMessageMutation}
+            reprocessThreadMutation={reprocessThreadMutation}
             showEditPanel={showEditPanel}
             onShowEditPanel={setShowEditPanel}
             editStatus={editStatus}

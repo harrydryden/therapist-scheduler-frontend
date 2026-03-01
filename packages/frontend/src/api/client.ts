@@ -562,6 +562,34 @@ export async function updateAppointment(
   return response.data;
 }
 
+// Thread reprocessing API
+
+export interface ReprocessThreadResult {
+  appointmentId: string;
+  userName: string;
+  therapistName: string;
+  threads: Array<{ threadId: string; type: string; cleared: number; reprocessed: number }>;
+  totalCleared: number;
+  totalReprocessed: number;
+  message: string;
+}
+
+export async function reprocessThread(
+  appointmentId: string
+): Promise<ReprocessThreadResult> {
+  const response = await fetchAdminApi<ReprocessThreadResult>(
+    `/admin/dashboard/appointments/${appointmentId}/reprocess-thread`,
+    {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }
+  );
+  if (!response.data) {
+    throw new Error('Failed to reprocess thread');
+  }
+  return response.data;
+}
+
 // Knowledge Base API functions
 
 export async function getKnowledgeEntries(): Promise<KnowledgeEntry[]> {
