@@ -758,9 +758,11 @@ class PostBookingFollowupService {
         userName: true,
         userEmail: true,
         therapistName: true,
+        therapistEmail: true,
         confirmedDateTime: true,
         confirmedDateTimeParsed: true,
         gmailThreadId: true,
+        therapistGmailThreadId: true,
         trackingCode: true, // Include for native feedback form URL
         status: true, // Include status for double-check
         notes: true, // FIX B5: Include notes for error logging
@@ -814,6 +816,9 @@ class PostBookingFollowupService {
 
       try {
         await this.sendFeedbackFormEmail(appointment);
+
+        // Send therapist feedback notification (same trigger as user feedback form)
+        await this.sendTherapistFeedbackNotificationEmail(appointment);
 
         // FIX B5: Use atomic update with sentinel check to verify we still own the lock
         // Only update feedbackFormSentAt here - status transition handled by lifecycle service
@@ -963,6 +968,53 @@ class PostBookingFollowupService {
       body,
       threadId: appointment.gmailThreadId || undefined,
     });
+  }
+
+  /**
+   * Send post-session notification to therapist with invoicing details.
+   * Triggered at the same time as the user feedback form email.
+   * Gated by the notifications.email.therapistFeedbackNotification setting.
+   */
+  private async sendTherapistFeedbackNotificationEmail(appointment: {
+    id: string;
+    userName: string | null;
+    therapistName: string;
+    therapistEmail: string;
+    therapistGmailThreadId: string | null;
+  }): Promise<void> {
+    // Check if therapist feedback notification is enabled
+    const enabled = await getSettingValue<boolean>('notifications.email.therapistFeedbackNotification');
+    if (!enabled) {
+      logger.debug(
+        { appointmentId: appointment.id },
+        'Therapist feedback notification disabled - skipping'
+      );
+      return;
+    }
+
+    const therapistFirstName = appointment.therapistName.split(' ')[0];
+    const clientFirstName = appointment.userName ? appointment.userName.split(' ')[0] : 'your client';
+
+    const subject = await getEmailSubject('therapistFeedbackNotification', {
+      therapistFirstName,
+      clientFirstName,
+    });
+    const body = await getEmailBody('therapistFeedbackNotification', {
+      therapistFirstName,
+      clientFirstName,
+    });
+
+    await emailProcessingService.sendEmail({
+      to: appointment.therapistEmail,
+      subject,
+      body,
+      threadId: appointment.therapistGmailThreadId || undefined,
+    });
+
+    logger.info(
+      { appointmentId: appointment.id, therapistEmail: appointment.therapistEmail },
+      'Sent therapist feedback notification email'
+    );
   }
 
   /**
