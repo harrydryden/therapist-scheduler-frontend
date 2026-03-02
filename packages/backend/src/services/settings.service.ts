@@ -283,6 +283,34 @@ Best wishes
 
 Justin`,
   },
+  'email.therapistFeedbackNotificationSubject': {
+    category: 'emailTemplates',
+    label: 'Therapist Feedback Notification - Subject',
+    description: 'Subject line for post-session notification to therapist. Variables: {therapistFirstName}, {clientFirstName}',
+    valueType: 'string',
+    defaultValue: 'Spill - Session with {clientFirstName} complete',
+  },
+  'email.therapistFeedbackNotificationBody': {
+    category: 'emailTemplates',
+    label: 'Therapist Feedback Notification - Body',
+    description: 'Email body for post-session notification to therapist with invoicing details. Variables: {therapistFirstName}, {clientFirstName}',
+    valueType: 'string',
+    defaultValue: `Hi {therapistFirstName}
+
+I hope your session with {clientFirstName} went well.
+That is the end of the Spill recruitment process. We will reach out to you in the next few days with an update.
+
+In the meantime, please do invoice us for the session.
+
+Invoice amount: £40
+Email invoices to: accounts@spill.chat
+Address invoices to:
+Spill App Limited
+9th Floor 107 Cheapside,
+London,
+United Kingdom,
+EC2V 6DN`,
+  },
   'email.feedbackReminderSubject': {
     category: 'emailTemplates',
     label: 'Feedback Reminder - Subject',
@@ -628,6 +656,13 @@ You're receiving this because you've indicated you are interested in free therap
     category: 'notifications',
     label: 'Email: Feedback Reminder',
     description: 'Send reminder email if feedback not received',
+    valueType: 'boolean',
+    defaultValue: true,
+  },
+  'notifications.email.therapistFeedbackNotification': {
+    category: 'notifications',
+    label: 'Email: Therapist Feedback Notification',
+    description: 'Send post-session notification to therapist with invoicing details when feedback form is sent to user',
     valueType: 'boolean',
     defaultValue: true,
   },
